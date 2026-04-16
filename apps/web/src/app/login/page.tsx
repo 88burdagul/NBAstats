@@ -1,19 +1,14 @@
-// Login Page
-// Users enter their email and password to log in
-
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
-// Force dynamic rendering (don't pre-render at build time)
 export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
   const router = useRouter()
   const { signIn } = useAuth()
-  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -23,110 +18,52 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     const { error } = await signIn(email, password)
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      router.push('/') // Redirect to homepage after login
-    }
+    if (error) { setError(error.message); setLoading(false) }
+    else router.push('/')
   }
 
   return (
-    <main className="min-h-screen bg-black py-8 px-4 flex items-center justify-center">
-      <div className="max-w-md w-full space-y-8">
-        
-        {/* Header */}
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔐</div>
-          <h1 className="text-5xl font-black text-primary uppercase tracking-tight mb-2">
-            Login
-          </h1>
-          <p className="text-text-muted text-sm uppercase tracking-wider font-semibold">
-            Welcome back to HoopMarket
-          </p>
+    <main className="min-h-screen bg-surface-0 flex items-center justify-center px-6">
+      <div className="w-full max-w-sm animate-fade-in">
+        <div className="text-center mb-8">
+          <button onClick={() => router.push('/')} className="text-accent text-xl font-extrabold tracking-tight">HOOPMARKET</button>
+          <h1 className="text-headline text-text-primary mt-6">Log in</h1>
+          <p className="text-sm text-text-secondary mt-1">Welcome back</p>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-card-dark border border-border-dark rounded-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                placeholder="your@email.com"
-              />
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                placeholder="••••••••"
-              />
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-market-red/10 border border-market-red rounded-lg p-3 text-market-red text-sm font-semibold">
-                ⚠️ {error}
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-6 py-3 bg-primary text-background-dark font-black rounded-lg hover:bg-primary/80 transition-all uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Logging In...' : 'Log In'}
-            </button>
-          </form>
-
-          {/* Signup Link */}
-          <div className="mt-6 text-center">
-            <p className="text-text-muted text-sm">
-              Don't have an account?{' '}
-              <button
-                onClick={() => router.push('/signup')}
-                className="text-primary font-bold hover:text-primary/80 transition-colors"
-              >
-                Sign up here
-              </button>
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="text-label text-text-tertiary uppercase mb-2 block">Email</label>
+            <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-tertiary"
+              placeholder="you@email.com" />
+          </div>
+          <div>
+            <label htmlFor="password" className="text-label text-text-tertiary uppercase mb-2 block">Password</label>
+            <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-tertiary"
+              placeholder="••••••••" />
           </div>
 
-          {/* Back Button */}
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => router.push('/')}
-              className="text-text-muted hover:text-white transition-colors text-sm"
-            >
-              ← Back to home
-            </button>
-          </div>
-        </div>
+          {error && (
+            <div className="bg-negative/10 border border-negative/20 rounded-xl p-3 text-negative text-sm">{error}</div>
+          )}
+
+          <button type="submit" disabled={loading}
+            className="w-full py-3 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent-dim transition-colors disabled:opacity-50">
+            {loading ? 'Logging in...' : 'Log in'}
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-text-tertiary mt-6">
+          No account?{' '}
+          <button onClick={() => router.push('/signup')} className="text-accent hover:underline">Sign up</button>
+        </p>
+        <p className="text-center mt-3">
+          <button onClick={() => router.push('/')} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors">Back to home</button>
+        </p>
       </div>
     </main>
   )
 }
-

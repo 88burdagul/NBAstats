@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
-// Force dynamic rendering (don't pre-render at build time)
 export const dynamic = 'force-dynamic'
 
 interface NBAPlayer {
@@ -20,64 +19,127 @@ interface NBAPlayer {
   rebounds: number
   assists: number
   imageUrl: string
-  // Stock market calculations
-  stockPrice?: number
-  priceChange?: number
+  rating?: number
+  ratingChange?: number
   percentChange?: number
-  volume?: number
 }
 
-type SortField = 'name' | 'stockPrice' | 'percentChange' | 'points' | 'gamesPlayed'
+type SortField = 'name' | 'rating' | 'percentChange' | 'points' | 'gamesPlayed'
 type SortOrder = 'asc' | 'desc'
+
+function Nav({ current, user, authLoading, onSignOut }: { current: string; user: any; authLoading: boolean; onSignOut: () => void }) {
+  const router = useRouter()
+  const links = [
+    { label: 'Players', href: '/' },
+    { label: 'Teams', href: '/teams' },
+    { label: 'Compare', href: '/compare' },
+    { label: 'Games', href: '/games' },
+    { label: 'Reports', href: '/reports' },
+  ]
+
+  return (
+    <nav className="flex items-center justify-between px-6 md:px-10 py-4 border-b border-border">
+      <div className="flex items-center gap-10">
+        <button onClick={() => router.push('/')} className="flex items-center gap-2">
+          <span className="text-accent text-xl font-extrabold tracking-tight">HOOPMARKET</span>
+        </button>
+
+        <div className="hidden md:flex items-center gap-1">
+          {links.map((link) => (
+            <button
+              key={link.href}
+              onClick={() => router.push(link.href)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                current === link.href
+                  ? 'text-accent bg-accent-glow'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {link.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {!authLoading && (
+          user ? (
+            <>
+              <button
+                onClick={() => router.push('/favorites')}
+                className="text-sm font-medium text-text-secondary hover:text-accent transition-colors"
+              >
+                Watchlist
+              </button>
+              <button
+                onClick={onSignOut}
+                className="text-sm font-medium text-text-tertiary hover:text-text-primary transition-colors"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => router.push('/login')}
+                className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Log in
+              </button>
+              <button
+                onClick={() => router.push('/signup')}
+                className="px-4 py-2 text-sm font-semibold bg-accent text-white rounded-lg hover:bg-accent-dim transition-colors"
+              >
+                Sign up
+              </button>
+            </>
+          )
+        )}
+      </div>
+    </nav>
+  )
+}
 
 export default function HomePage() {
   const router = useRouter()
   const { user, signOut, loading: authLoading } = useAuth()
-  
+
   const [players, setPlayers] = useState<NBAPlayer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  
+
   const [selectedTeam, setSelectedTeam] = useState<string>('all')
   const [selectedPosition, setSelectedPosition] = useState<string>('all')
   const [minGamesPlayed, setMinGamesPlayed] = useState<number>(0)
-  
-  const [sortField, setSortField] = useState<SortField>('stockPrice')
+
+  const [sortField, setSortField] = useState<SortField>('rating')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [addingFavorite, setAddingFavorite] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
-  // Calculate "stock price" based on player performance
-  // Formula creates realistic stock-like values ($20-$150 range)
-  const calculateStockMetrics = (player: any) => {
-    // Base price of $20, then add performance bonuses
-    // PPG contributes most (scoring premium), then assists (playmaking), then rebounds
-    const basePrice = 20
-    const scoringBonus = player.points * 2.5  // 25 PPG = +62.5
-    const assistBonus = player.assists * 3    // 10 APG = +30
-    const reboundBonus = player.rebounds * 1.5 // 10 RPG = +15
-    const experienceBonus = Math.min(player.gamesPlayed * 0.1, 8) // Cap at +8 for 80 games
-    
-    const stockPrice = basePrice + scoringBonus + assistBonus + reboundBonus + experienceBonus
-    
-    // Simulate price change based on performance (seeded by player ID for consistency)
+  const calculateRating = (player: any) => {
+    const baseRating = 20
+    const scoringBonus = player.points * 2.5
+    const assistBonus = player.assists * 3
+    const reboundBonus = player.rebounds * 1.5
+    const experienceBonus = Math.min(player.gamesPlayed * 0.1, 8)
+
+    const rating = baseRating + scoringBonus + assistBonus + reboundBonus + experienceBonus
+
     const seed = parseInt(player.id) || 1
     const seededRandom = Math.sin(seed * 12.9898) * 43758.5453
     const randomFactor = seededRandom - Math.floor(seededRandom)
-    const priceChange = (randomFactor * 20) - 8 // Range: -8 to +12
-    const percentChange = stockPrice > 0 ? (priceChange / stockPrice) * 100 : 0
-    
-    // Volume = games played * 1000 (more realistic trading volume)
-    const volume = player.gamesPlayed * 1000
-    
+    const ratingChange = (randomFactor * 20) - 8
+    const percentChange = rating > 0 ? (ratingChange / rating) * 100 : 0
+
     return {
       ...player,
-      stockPrice: parseFloat(stockPrice.toFixed(2)),
-      priceChange: parseFloat(priceChange.toFixed(2)),
-      percentChange: parseFloat(percentChange.toFixed(2)),
-      volume
+      rating: parseFloat(rating.toFixed(1)),
+      ratingChange: parseFloat(ratingChange.toFixed(2)),
+      percentChange: parseFloat(percentChange.toFixed(1)),
     }
   }
 
@@ -96,78 +158,50 @@ export default function HomePage() {
 
   const fetchFavorites = async () => {
     try {
-      const { data } = await supabase
-        .from('favorite_players')
-        .select('player_id')
-
-      if (data) {
-        setFavorites(new Set(data.map(fav => fav.player_id)))
-      }
+      const { data } = await supabase.from('favorite_players').select('player_id')
+      if (data) setFavorites(new Set(data.map(fav => fav.player_id)))
     } catch (err) {
       console.error('Error fetching favorites:', err)
     }
   }
 
-  const toggleFavorite = async (player: NBAPlayer) => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
+  const toggleFavorite = async (e: React.MouseEvent, player: NBAPlayer) => {
+    e.stopPropagation()
+    if (!user) { router.push('/login'); return }
     setAddingFavorite(player.id)
 
     try {
       if (favorites.has(player.id)) {
-        const { error } = await supabase
-          .from('favorite_players')
-          .delete()
-          .eq('player_id', player.id)
-
-        if (error) throw error
-
-        const newFavorites = new Set(favorites)
-        newFavorites.delete(player.id)
-        setFavorites(newFavorites)
+        await supabase.from('favorite_players').delete().eq('player_id', player.id)
+        const next = new Set(favorites)
+        next.delete(player.id)
+        setFavorites(next)
       } else {
-        const { error } = await supabase
-          .from('favorite_players')
-          .insert({
-            user_id: user.id,
-            player_id: player.id,
-            player_name: player.name,
-            team: player.team
-          })
-
-        if (error) throw error
-
-        const newFavorites = new Set(favorites)
-        newFavorites.add(player.id)
-        setFavorites(newFavorites)
+        await supabase.from('favorite_players').insert({
+          user_id: user.id, player_id: player.id,
+          player_name: player.name, team: player.team,
+        })
+        setFavorites(new Set(favorites).add(player.id))
       }
     } catch (err) {
       console.error('Error toggling favorite:', err)
-      alert('Failed to update portfolio. Please try again.')
     } finally {
       setAddingFavorite(null)
     }
   }
 
-  useEffect(() => {
-    fetchPlayers()
-  }, [])
+  useEffect(() => { fetchPlayers() }, [])
 
   const fetchPlayers = async () => {
     try {
       setLoading(true)
       setError('')
-      
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
       const response = await fetch(`${apiUrl}/api/players/all`)
       const data = await response.json()
-      
+
       if (data.success && data.data && data.indices) {
         const { indices } = data
-        
         const transformedPlayers = data.data
           .map((player: any[]) => ({
             id: player[indices.playerId],
@@ -180,18 +214,17 @@ export default function HomePage() {
             points: player[indices.points] || 0,
             rebounds: player[indices.rebounds] || 0,
             assists: player[indices.assists] || 0,
-            imageUrl: `https://cdn.nba.com/headshots/nba/latest/1040x760/${player[indices.playerId]}.png`
+            imageUrl: `https://cdn.nba.com/headshots/nba/latest/1040x760/${player[indices.playerId]}.png`,
           }))
           .filter((p: NBAPlayer) => p.gamesPlayed > 0)
-          .map(calculateStockMetrics)
-        
+          .map(calculateRating)
+
         setPlayers(transformedPlayers)
       }
-      
       setLoading(false)
     } catch (err) {
       console.error('Error fetching players:', err)
-      setError('Failed to connect to market data. Make sure the API is running.')
+      setError('Unable to load player data. Make sure the API server is running.')
       setLoading(false)
     }
   }
@@ -204,475 +237,323 @@ export default function HomePage() {
       const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesTeam = selectedTeam === 'all' || player.team === selectedTeam
       const matchesPosition = selectedPosition === 'all' || player.position === selectedPosition
-      const matchesGamesPlayed = player.gamesPlayed >= minGamesPlayed
-      
-      return matchesSearch && matchesTeam && matchesPosition && matchesGamesPlayed
+      const matchesGames = player.gamesPlayed >= minGamesPlayed
+      return matchesSearch && matchesTeam && matchesPosition && matchesGames
     })
     .sort((a, b) => {
-      let comparison = 0
-      
+      let cmp = 0
       switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name)
-          break
-        case 'stockPrice':
-          comparison = (a.stockPrice || 0) - (b.stockPrice || 0)
-          break
-        case 'percentChange':
-          comparison = (a.percentChange || 0) - (b.percentChange || 0)
-          break
-        case 'points':
-          comparison = a.points - b.points
-          break
-        case 'gamesPlayed':
-          comparison = a.gamesPlayed - b.gamesPlayed
-          break
+        case 'name': cmp = a.name.localeCompare(b.name); break
+        case 'rating': cmp = (a.rating || 0) - (b.rating || 0); break
+        case 'percentChange': cmp = (a.percentChange || 0) - (b.percentChange || 0); break
+        case 'points': cmp = a.points - b.points; break
+        case 'gamesPlayed': cmp = a.gamesPlayed - b.gamesPlayed; break
       }
-      
-      return sortOrder === 'asc' ? comparison : -comparison
+      return sortOrder === 'asc' ? cmp : -cmp
     })
 
-  // Get top gainers and losers
-  const topGainers = [...players].sort((a, b) => (b.percentChange || 0) - (a.percentChange || 0)).slice(0, 5)
-  const topLosers = [...players].sort((a, b) => (a.percentChange || 0) - (b.percentChange || 0)).slice(0, 5)
+  const trendingUp = [...players].sort((a, b) => (b.percentChange || 0) - (a.percentChange || 0)).slice(0, 5)
+  const trendingDown = [...players].sort((a, b) => (a.percentChange || 0) - (b.percentChange || 0)).slice(0, 5)
 
-  // Calculate market index (average of top 100 players)
-  const marketIndex = players.length > 0 
-    ? players.slice(0, 100).reduce((sum, p) => sum + (p.stockPrice || 0), 0) / Math.min(players.length, 100)
+  const leaguePulse = players.length > 0
+    ? players.slice(0, 100).reduce((sum, p) => sum + (p.rating || 0), 0) / Math.min(players.length, 100)
     : 0
-
-  const avgPercentChange = players.length > 0
+  const avgChange = players.length > 0
     ? players.reduce((sum, p) => sum + (p.percentChange || 0), 0) / players.length
     : 0
 
   return (
-    <main className="min-h-screen bg-background-dark">
-      
-      {/* LIVE TICKER TAPE */}
-      <div className="ticker-wrap">
-        <div className="ticker-content text-xs font-bold tracking-wider">
-          {topGainers.map((player, i) => (
-            <span key={i} className="flex items-center gap-2 uppercase">
-              {player.name.split(' ').pop()} 
-              <span className={player.percentChange && player.percentChange >= 0 ? 'text-primary' : 'text-market-red'}>
-                ${player.stockPrice?.toFixed(2)} ({player.percentChange && player.percentChange >= 0 ? '+' : ''}{player.percentChange?.toFixed(1)}%)
+    <main className="min-h-screen bg-surface-0">
+      <Nav current="/" user={user} authLoading={authLoading} onSignOut={handleSignOut} />
+
+      {/* Ticker */}
+      {!loading && players.length > 0 && (
+        <div className="ticker-wrap">
+          <div className="ticker-content text-label text-text-tertiary">
+            {[...trendingUp, ...trendingDown, ...trendingUp].map((player, i) => (
+              <span key={i} className="flex items-center gap-2">
+                <span className="text-text-secondary font-semibold">{player.name.split(' ').pop()}</span>
+                <span className="stat-num">{player.rating?.toFixed(1)}</span>
+                <span className={`stat-num ${(player.percentChange || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {(player.percentChange || 0) >= 0 ? '+' : ''}{player.percentChange?.toFixed(1)}%
+                </span>
               </span>
-            </span>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="px-6 md:px-20 lg:px-40 py-5">
-        <div className="max-w-[1400px] mx-auto">
-          
-          {/* HEADER */}
-          <header className="flex items-center justify-between border-b border-border-dark px-4 py-3 mb-6">
-            <div className="flex items-center gap-8">
-              <div className="flex items-center gap-4">
-                <div className="text-primary text-4xl">📈</div>
-                <h2 className="text-white text-xl font-bold leading-tight tracking-tight">HOOPMARKET</h2>
-              </div>
-              
-              {/* Search */}
-              <label className="hidden md:flex flex-col min-w-40 h-10 max-w-64">
-                <div className="flex w-full items-stretch rounded-lg h-full">
-                  <div className="text-text-muted flex border-none bg-border-dark items-center justify-center pl-4 rounded-l-lg">
-                    <span>🔍</span>
-                  </div>
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex w-full min-w-0 flex-1 rounded-lg text-white focus:outline-0 focus:ring-0 border-none bg-border-dark h-full placeholder:text-text-muted px-4 rounded-l-none text-sm font-normal"
-                    placeholder="Search Players or Teams"
-                  />
-                </div>
-              </label>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="hidden lg:flex items-center gap-6">
-                <button onClick={() => router.push('/')} className="text-primary text-sm font-bold border-b-2 border-primary pb-1">Dashboard</button>
-                {user && <button onClick={() => router.push('/favorites')} className="text-text-muted hover:text-white text-sm font-medium transition-colors">Portfolio</button>}
-                <button onClick={() => router.push('/teams')} className="text-text-muted hover:text-white text-sm font-medium transition-colors">Teams</button>
-                <button onClick={() => router.push('/compare')} className="text-text-muted hover:text-white text-sm font-medium transition-colors">Screener</button>
-              </div>
-              
-              <div className="flex gap-2">
-                {!authLoading && (
-                  <>
-                    {user ? (
-                      <>
-                        <button
-                          onClick={() => router.push('/favorites')}
-                          className="hidden md:flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-background-dark text-sm font-bold hover:bg-primary/80 transition-all"
-                        >
-                          My Portfolio
-                        </button>
-                        <button
-                          onClick={handleSignOut}
-                          className="flex items-center justify-center rounded-lg h-10 px-4 bg-border-dark text-white hover:bg-border-dark/80 transition-all"
-                        >
-                          Logout
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => router.push('/login')}
-                          className="flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-background-dark text-sm font-bold hover:bg-primary/80 transition-all"
-                        >
-                          Login
-                        </button>
-                        <button
-                          onClick={() => router.push('/signup')}
-                          className="hidden md:flex items-center justify-center rounded-lg h-10 px-4 bg-border-dark text-white hover:bg-border-dark/80 transition-all"
-                        >
-                          Sign Up
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </header>
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
 
-          {/* MARKET SUMMARY */}
-          {!loading && !error && (
-            <div className="flex flex-wrap gap-4 px-4 pb-6">
-              <div className="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-border-dark bg-card-dark/30 market-card">
-                <p className="text-text-muted text-xs font-semibold uppercase tracking-widest">NBA 100 Index</p>
-                <p className="text-white tracking-light text-2xl font-bold leading-tight">${marketIndex.toFixed(2)}</p>
-                <p className={`text-sm font-medium ${avgPercentChange >= 0 ? 'text-primary' : 'text-market-red'}`}>
-                  {avgPercentChange >= 0 ? '+' : ''}{avgPercentChange.toFixed(2)}% <span className="text-text-muted font-normal">Today</span>
-                </p>
-              </div>
-              
-              <div className="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-border-dark bg-card-dark/30 market-card">
-                <p className="text-text-muted text-xs font-semibold uppercase tracking-widest">Total Players</p>
-                <p className="text-white tracking-light text-2xl font-bold leading-tight">{players.length}</p>
-                <p className="text-primary text-sm font-medium">Active <span className="text-text-muted font-normal">This Season</span></p>
-              </div>
-              
-              <div className="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-border-dark bg-card-dark/30 market-card">
-                <p className="text-text-muted text-xs font-semibold uppercase tracking-widest">Market Sentiment</p>
-                <p className="text-white tracking-light text-2xl font-bold leading-tight">{avgPercentChange >= 0 ? 'Bullish' : 'Bearish'}</p>
-                <p className="text-primary text-sm font-medium">{Math.abs(avgPercentChange).toFixed(1)}% <span className="text-text-muted font-normal">Confidence</span></p>
-              </div>
-            </div>
-          )}
+        {/* Hero */}
+        {!loading && !error && (
+          <div className="mb-10 animate-fade-in">
+            <h1 className="text-display text-text-primary mb-2">
+              Every player.<br />
+              <span className="text-accent-gradient">Rated.</span>
+            </h1>
+            <p className="text-lg text-text-secondary max-w-md">
+              Real-time ratings built from live NBA performance data.
+            </p>
+          </div>
+        )}
 
-          {/* LOADING */}
-          {loading && (
-            <div className="text-center py-20">
-              <div className="relative inline-block">
-                <div className="animate-spin rounded-full h-24 w-24 border-b-8 border-primary mx-auto glow-green"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl">📊</span>
-                </div>
-              </div>
-              <p className="text-primary mt-6 font-black text-xl">LOADING MARKET DATA...</p>
-              <p className="text-text-muted text-sm mt-2 font-semibold">Fetching player stocks</p>
+        {/* Pulse Stats */}
+        {!loading && !error && (
+          <div className="grid grid-cols-3 gap-px bg-border rounded-2xl overflow-hidden mb-10 animate-fade-up">
+            <div className="bg-surface-1 p-6">
+              <p className="text-label text-text-tertiary uppercase mb-2">League Pulse</p>
+              <p className="stat-num text-stat text-text-primary">{leaguePulse.toFixed(1)}</p>
             </div>
-          )}
+            <div className="bg-surface-1 p-6">
+              <p className="text-label text-text-tertiary uppercase mb-2">Active Players</p>
+              <p className="stat-num text-stat text-text-primary">{players.length}</p>
+            </div>
+            <div className="bg-surface-1 p-6">
+              <p className="text-label text-text-tertiary uppercase mb-2">Avg Trend</p>
+              <p className={`stat-num text-stat ${avgChange >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {avgChange >= 0 ? '+' : ''}{avgChange.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        )}
 
-          {/* ERROR */}
-          {error && (
-            <div className="bg-market-red/20 border-2 border-market-red rounded-2xl p-8 mb-4">
-              <div className="flex items-start gap-4">
-                <span className="text-market-red text-4xl">⚠️</span>
-                <div className="flex-1">
-                  <p className="text-white font-black text-xl mb-2">{error}</p>
+        {/* Trending */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+            <div className="animate-fade-up stagger-1" style={{ opacity: 0 }}>
+              <h2 className="text-label text-positive uppercase mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-positive" /> Trending Up
+              </h2>
+              <div className="flex flex-col">
+                {trendingUp.map((player, i) => (
                   <button
-                    onClick={fetchPlayers}
-                    className="mt-6 px-6 py-3 bg-primary text-background-dark font-black rounded-lg hover:bg-primary/80 transition-all"
-                  >
-                    🔄 RECONNECT TO MARKET
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* MAIN CONTENT */}
-          {!loading && !error && (
-            <>
-              {/* GAINERS & LOSERS */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 mb-6">
-                {/* Gainers */}
-                <div className="rounded-xl border border-border-dark bg-card-dark/10 p-4">
-                  <h3 className="text-primary text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                    📈 Market Gainers
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {topGainers.slice(0, 3).map((player) => (
-                      <div
-                        key={player.id}
-                        onClick={() => router.push(`/player/${player.id}`)}
-                        className="flex items-center justify-between p-2 hover:bg-border-dark/30 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={player.imageUrl}
-                            alt={player.name}
-                            className="w-10 h-10 rounded-full object-cover bg-gray-800"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                            }}
-                          />
-                          <div>
-                            <p className="text-sm font-bold">{player.name.split(' ').pop()}</p>
-                            <p className="text-xs text-text-muted">{player.team} • ${player.stockPrice?.toFixed(2)}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-primary font-bold text-sm">+{player.percentChange?.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Losers */}
-                <div className="rounded-xl border border-border-dark bg-card-dark/10 p-4">
-                  <h3 className="text-market-red text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                    📉 Market Losers
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {topLosers.slice(0, 3).map((player) => (
-                      <div
-                        key={player.id}
-                        onClick={() => router.push(`/player/${player.id}`)}
-                        className="flex items-center justify-between p-2 hover:bg-border-dark/30 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={player.imageUrl}
-                            alt={player.name}
-                            className="w-10 h-10 rounded-full object-cover bg-gray-800"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                            }}
-                          />
-                          <div>
-                            <p className="text-sm font-bold">{player.name.split(' ').pop()}</p>
-                            <p className="text-xs text-text-muted">{player.team} • ${player.stockPrice?.toFixed(2)}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-market-red font-bold text-sm">{player.percentChange?.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* FILTERS */}
-              <div className="bg-card-dark/20 border border-border-dark rounded-xl p-6 mb-6 mx-4">
-                <h3 className="font-black text-primary mb-4 flex items-center gap-2 text-lg">
-                  <span>🎯</span> MARKET FILTERS
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">Team</label>
-                    <select
-                      value={selectedTeam}
-                      onChange={(e) => setSelectedTeam(e.target.value)}
-                      className="w-full px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                    >
-                      <option value="all">All Teams</option>
-                      {uniqueTeams.map(team => (
-                        <option key={team} value={team}>{team}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">Position</label>
-                    <select
-                      value={selectedPosition}
-                      onChange={(e) => setSelectedPosition(e.target.value)}
-                      className="w-full px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                    >
-                      <option value="all">All Positions</option>
-                      {uniquePositions.map(position => (
-                        <option key={position} value={position}>{position}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">Min Games</label>
-                    <select
-                      value={minGamesPlayed}
-                      onChange={(e) => setMinGamesPlayed(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                    >
-                      <option value="0">All</option>
-                      <option value="10">10+</option>
-                      <option value="20">20+</option>
-                      <option value="40">40+</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">Sort By</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={sortField}
-                        onChange={(e) => setSortField(e.target.value as SortField)}
-                        className="flex-1 px-4 py-3 bg-background-dark border border-border-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-white font-semibold"
-                      >
-                        <option value="stockPrice">Stock Price</option>
-                        <option value="percentChange">% Change</option>
-                        <option value="points">Points</option>
-                        <option value="gamesPlayed">Games</option>
-                        <option value="name">Name</option>
-                      </select>
-                      <button
-                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                        className="px-4 py-3 bg-primary hover:bg-primary/80 text-background-dark font-black rounded-lg transition-all"
-                      >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-border-dark">
-                  <p className="text-sm text-text-muted font-semibold">
-                    Showing <span className="text-primary font-black text-lg">{filteredAndSortedPlayers.length}</span> of <span className="text-white font-bold">{players.length}</span> stocks
-                  </p>
-                  <button
-                    onClick={() => {
-                      setSearchTerm('')
-                      setSelectedTeam('all')
-                      setSelectedPosition('all')
-                      setMinGamesPlayed(0)
-                      setSortField('stockPrice')
-                      setSortOrder('desc')
-                    }}
-                    className="px-4 py-2 bg-market-red hover:bg-market-red/80 text-white font-bold rounded-lg transition-all"
-                  >
-                    🔄 Reset
-                  </button>
-                </div>
-              </div>
-
-              {/* PLAYER STOCKS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4 max-h-[1000px] overflow-y-auto scrollbar-hide">
-                {filteredAndSortedPlayers.slice(0, 100).map((player) => (
-                  <div
                     key={player.id}
-                    className="bg-card-dark border border-border-dark rounded-xl overflow-hidden hover:border-primary hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer market-card relative"
                     onClick={() => router.push(`/player/${player.id}`)}
+                    className="hover-row flex items-center justify-between py-3 px-3 -mx-3 rounded-lg cursor-pointer"
                   >
-                    {/* Portfolio Star */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(player)
-                      }}
-                      disabled={addingFavorite === player.id}
-                      className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center font-black text-lg transition-all ${
-                        favorites.has(player.id)
-                          ? 'bg-primary text-background-dark'
-                          : 'bg-background-dark/80 text-text-muted hover:bg-primary hover:text-background-dark'
-                      }`}
-                    >
-                      {addingFavorite === player.id ? '...' : favorites.has(player.id) ? '★' : '☆'}
-                    </button>
-
-                    <div className="relative h-40 bg-gradient-to-br from-border-dark to-background-dark overflow-hidden">
-                      <img
-                        src={player.imageUrl}
-                        alt={player.name}
-                        className="w-full h-full object-contain object-center transition-transform duration-500 group-hover:scale-110"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                        }}
-                      />
-                      <div className="absolute bottom-3 left-3 bg-background-dark/90 border border-primary text-primary text-xs font-black px-3 py-1 rounded-full">
-                        {player.team}
-                      </div>
-                      <div className="absolute bottom-3 right-3 bg-background-dark/90 border border-border-dark text-text-muted text-xs font-black px-3 py-1 rounded-full">
-                        {player.position}
+                    <div className="flex items-center gap-4">
+                      <span className="text-text-tertiary text-sm font-mono w-4">{i + 1}</span>
+                      <img src={player.imageUrl} alt="" className="w-9 h-9 rounded-full object-cover bg-surface-2"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-text-primary">{player.name}</p>
+                        <p className="text-xs text-text-tertiary">{player.team} · {player.position}</p>
                       </div>
                     </div>
-                    
-                    <div className="p-4 bg-card-dark">
-                      <h3 className="font-black text-white text-sm mb-2 truncate">{player.name}</h3>
-                      
-                      {/* Stock Price */}
-                      <div className="mb-3">
-                        <div className="flex items-end gap-2">
-                          <span className="text-2xl font-black text-primary">${player.stockPrice?.toFixed(2)}</span>
-                          <span className={`text-sm font-bold ${player.percentChange && player.percentChange >= 0 ? 'text-primary' : 'text-market-red'}`}>
-                            {player.percentChange && player.percentChange >= 0 ? '+' : ''}{player.percentChange?.toFixed(1)}%
-                          </span>
-                        </div>
-                        <p className="text-xs text-text-muted mt-1">Vol: {(player.volume || 0).toLocaleString()}</p>
-                      </div>
-
-                      {/* Stats */}
-                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div className="bg-background-dark rounded px-2 py-1">
-                          <div className="font-bold text-white">{player.points.toFixed(1)}</div>
-                          <div className="text-text-muted">PPG</div>
-                        </div>
-                        <div className="bg-background-dark rounded px-2 py-1">
-                          <div className="font-bold text-white">{player.rebounds.toFixed(1)}</div>
-                          <div className="text-text-muted">RPG</div>
-                        </div>
-                        <div className="bg-background-dark rounded px-2 py-1">
-                          <div className="font-bold text-white">{player.assists.toFixed(1)}</div>
-                          <div className="text-text-muted">APG</div>
-                        </div>
-                      </div>
+                    <div className="text-right">
+                      <p className="stat-num text-sm font-bold text-text-primary">{player.rating?.toFixed(1)}</p>
+                      <p className="stat-num text-xs text-positive">+{player.percentChange?.toFixed(1)}%</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
+            </div>
 
-              {/* NO RESULTS */}
-              {filteredAndSortedPlayers.length === 0 && (
-                <div className="text-center py-20">
-                  <div className="text-6xl mb-4">📊</div>
-                  <p className="text-2xl font-black text-primary mb-2">NO STOCKS FOUND</p>
-                  <p className="text-sm text-text-muted mb-6 font-semibold">Try adjusting your filters</p>
+            <div className="animate-fade-up stagger-2" style={{ opacity: 0 }}>
+              <h2 className="text-label text-negative uppercase mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-negative" /> Trending Down
+              </h2>
+              <div className="flex flex-col">
+                {trendingDown.map((player, i) => (
                   <button
-                    onClick={() => {
-                      setSearchTerm('')
-                      setSelectedTeam('all')
-                      setSelectedPosition('all')
-                      setMinGamesPlayed(0)
-                    }}
-                    className="px-8 py-4 bg-primary text-background-dark font-black rounded-xl hover:bg-primary/80 transition-all"
+                    key={player.id}
+                    onClick={() => router.push(`/player/${player.id}`)}
+                    className="hover-row flex items-center justify-between py-3 px-3 -mx-3 rounded-lg cursor-pointer"
                   >
-                    🔄 RESET FILTERS
+                    <div className="flex items-center gap-4">
+                      <span className="text-text-tertiary text-sm font-mono w-4">{i + 1}</span>
+                      <img src={player.imageUrl} alt="" className="w-9 h-9 rounded-full object-cover bg-surface-2"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-text-primary">{player.name}</p>
+                        <p className="text-xs text-text-tertiary">{player.team} · {player.position}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="stat-num text-sm font-bold text-text-primary">{player.rating?.toFixed(1)}</p>
+                      <p className="stat-num text-xs text-negative">{player.percentChange?.toFixed(1)}%</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Divider */}
+        {!loading && !error && <div className="divider mb-8" />}
+
+        {/* Search + Filters */}
+        {!loading && !error && (
+          <div className="mb-6 animate-fade-up stagger-3" style={{ opacity: 0 }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 relative">
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-tertiary"
+                  placeholder="Search players..."
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-3 text-sm font-medium rounded-xl border transition-colors ${
+                  showFilters ? 'border-accent text-accent bg-accent-glow' : 'border-border text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Filters
+              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value as SortField)}
+                  className="bg-surface-1 border border-border rounded-xl px-3 py-3 text-sm text-text-primary"
+                >
+                  <option value="rating">Rating</option>
+                  <option value="percentChange">Trend</option>
+                  <option value="points">Points</option>
+                  <option value="gamesPlayed">Games</option>
+                  <option value="name">Name</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="w-11 h-11 flex items-center justify-center bg-surface-1 border border-border rounded-xl text-text-secondary hover:text-accent transition-colors text-sm"
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-3 gap-3 animate-fade-up">
+                <select value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="bg-surface-1 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary">
+                  <option value="all">All Teams</option>
+                  {uniqueTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={selectedPosition} onChange={(e) => setSelectedPosition(e.target.value)}
+                  className="bg-surface-1 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary">
+                  <option value="all">All Positions</option>
+                  {uniquePositions.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select value={minGamesPlayed} onChange={(e) => setMinGamesPlayed(Number(e.target.value))}
+                  className="bg-surface-1 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary">
+                  <option value="0">Min Games: Any</option>
+                  <option value="10">10+ Games</option>
+                  <option value="20">20+ Games</option>
+                  <option value="40">40+ Games</option>
+                </select>
+              </div>
+            )}
+
+            <p className="text-xs text-text-tertiary mt-3">
+              {filteredAndSortedPlayers.length} of {players.length} players
+            </p>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
+            <div className="w-10 h-10 border-2 border-surface-3 border-t-accent rounded-full animate-spin mb-6" />
+            <p className="text-sm text-text-secondary">Loading player data</p>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="bg-surface-1 border border-negative/20 rounded-2xl p-8 text-center animate-fade-in">
+            <p className="text-text-primary font-semibold mb-2">{error}</p>
+            <button onClick={fetchPlayers}
+              className="mt-4 px-5 py-2.5 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent-dim transition-colors">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Player List */}
+        {!loading && !error && (
+          <div className="animate-fade-up stagger-4" style={{ opacity: 0 }}>
+            {/* Header row */}
+            <div className="hidden md:grid grid-cols-[1fr_80px_80px_80px_80px_80px_40px] gap-4 px-4 py-2 text-label text-text-tertiary uppercase border-b border-border">
+              <span>Player</span>
+              <span className="text-right">Rating</span>
+              <span className="text-right">Trend</span>
+              <span className="text-right">PPG</span>
+              <span className="text-right">RPG</span>
+              <span className="text-right">APG</span>
+              <span />
+            </div>
+
+            <div className="max-h-[700px] overflow-y-auto scrollbar-hide">
+              {filteredAndSortedPlayers.slice(0, 100).map((player, i) => (
+                <div
+                  key={player.id}
+                  onClick={() => router.push(`/player/${player.id}`)}
+                  className="hover-row grid grid-cols-[1fr_auto] md:grid-cols-[1fr_80px_80px_80px_80px_80px_40px] gap-4 items-center px-4 py-3.5 border-b border-border/50 cursor-pointer group"
+                >
+                  {/* Player info */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-text-tertiary text-xs font-mono w-6 text-right shrink-0">{i + 1}</span>
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-2 shrink-0">
+                      <img src={player.imageUrl} alt="" className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text-primary truncate group-hover:text-accent transition-colors">
+                        {player.name}
+                      </p>
+                      <p className="text-xs text-text-tertiary">{player.team} · {player.position} · {player.gamesPlayed}G</p>
+                    </div>
+                  </div>
+
+                  {/* Mobile: compact stats */}
+                  <div className="flex md:hidden items-center gap-3">
+                    <span className="stat-num text-sm font-bold text-text-primary">{player.rating?.toFixed(1)}</span>
+                    <span className={`stat-num text-xs font-semibold ${(player.percentChange || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {(player.percentChange || 0) >= 0 ? '+' : ''}{player.percentChange?.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  {/* Desktop columns */}
+                  <span className="hidden md:block stat-num text-sm font-bold text-text-primary text-right">{player.rating?.toFixed(1)}</span>
+                  <span className={`hidden md:block stat-num text-sm text-right font-semibold ${(player.percentChange || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {(player.percentChange || 0) >= 0 ? '+' : ''}{player.percentChange?.toFixed(1)}%
+                  </span>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{player.points.toFixed(1)}</span>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{player.rebounds.toFixed(1)}</span>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{player.assists.toFixed(1)}</span>
+
+                  {/* Watchlist */}
+                  <button
+                    onClick={(e) => toggleFavorite(e, player)}
+                    disabled={addingFavorite === player.id}
+                    className={`hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors text-sm ${
+                      favorites.has(player.id)
+                        ? 'text-accent'
+                        : 'text-text-tertiary hover:text-accent'
+                    }`}
+                  >
+                    {favorites.has(player.id) ? '★' : '☆'}
                   </button>
                 </div>
-              )}
-            </>
-          )}
+              ))}
+            </div>
 
-        </div>
+            {filteredAndSortedPlayers.length === 0 && (
+              <div className="text-center py-20">
+                <p className="text-text-secondary mb-2">No players match your filters</p>
+                <button
+                  onClick={() => { setSearchTerm(''); setSelectedTeam('all'); setSelectedPosition('all'); setMinGamesPlayed(0) }}
+                  className="text-sm text-accent hover:underline">
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* FOOTER */}
-      <footer className="mt-12 border-t border-border-dark py-8 text-center text-text-muted text-xs">
-        <p className="mb-4 uppercase tracking-widest">Market data is calculated based on real-time NBA statistics.</p>
-        <div className="flex justify-center gap-8">
-          <button onClick={() => router.push('/games')} className="hover:text-primary transition-colors">Live Games</button>
-          <button onClick={() => router.push('/teams')} className="hover:text-primary transition-colors">Teams</button>
-          <button onClick={() => router.push('/compare')} className="hover:text-primary transition-colors">Compare</button>
-        </div>
-      </footer>
     </main>
   )
 }

@@ -1,46 +1,43 @@
-/* Global CSS - Stock Market Theme */
-
-/* Import Tailwind CSS utilities */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Import Inter font from Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* Global styles with stock market theme */
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a1410;
+  background: #0A0A0B;
   min-height: 100vh;
-  color: #ffffff;
+  color: #F5F5F7;
 }
 
-/* Custom scrollbar styling - Market theme */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 12px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a1410;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #13ec80;
-  border-radius: 6px;
+  background: #2A2A2E;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0fbb65;
+  background: #3A3A3F;
 }
 
-/* Hide scrollbar for ticker and certain elements */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -50,72 +47,116 @@ body {
   scrollbar-width: none;
 }
 
-/* Ticker Tape Animation */
+/* Ticker */
 .ticker-wrap {
   overflow: hidden;
   width: 100%;
-  background: #0a1410;
-  border-bottom: 1px solid #234836;
-  height: 40px;
+  background: #0A0A0B;
+  border-bottom: 1px solid #1A1A1D;
+  height: 36px;
 }
 
 .ticker-content {
-  display: flex;
+  display: inline-flex;
   white-space: nowrap;
-  animation: ticker 40s linear infinite;
+  animation: ticker 60s linear infinite;
   align-items: center;
   height: 100%;
-  gap: 3rem;
+  gap: 2.5rem;
+  padding-right: 2.5rem;
 }
 
-@keyframes ticker {
-  0% {
-    transform: translateX(100%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
+/* Hover lift — subtle, no glow */
+.hover-lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* Glow effects */
-.glow-green {
-  box-shadow: 0 0 20px rgba(19, 236, 128, 0.3);
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.glow-red {
-  box-shadow: 0 0 20px rgba(250, 85, 56, 0.3);
+/* Hover row — table/list rows */
+.hover-row {
+  transition: background 0.15s ease;
 }
 
-/* Pulse animation for live indicators */
-@keyframes pulse-green {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.hover-row:hover {
+  background: rgba(255, 107, 0, 0.04);
 }
 
-.pulse-green {
-  animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* Accent underline on hover */
+.hover-accent {
+  position: relative;
+  transition: color 0.2s ease;
 }
 
-/* Candlestick chart styles */
-.candlestick-green {
-  fill: #13ec80;
+.hover-accent::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #FF6B00;
+  transition: width 0.25s ease;
 }
 
-.candlestick-red {
-  fill: #fa5538;
+.hover-accent:hover::after {
+  width: 100%;
 }
 
-/* Market card hover effect */
-.market-card {
-  transition: all 0.3s ease;
+.hover-accent:hover {
+  color: #FF6B00;
 }
 
-.market-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(19, 236, 128, 0.2);
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* Stat number styling */
+.stat-num {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
+/* Divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #2A2A2E 20%, #2A2A2E 80%, transparent);
+}
+
+/* Accent gradient text */
+.text-accent-gradient {
+  background: linear-gradient(135deg, #FF6B00, #FF8C40);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Live pulse dot */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34C759;
+  animation: pulseLive 2s ease-in-out infinite;
+}
+
+@keyframes pulseLive {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(52, 199, 89, 0); }
+}
+
+/* Focus ring */
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.3);
+}

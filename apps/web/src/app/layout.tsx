@@ -1,14 +1,11 @@
-// Root Layout - This wraps around all pages in your app
-// Think of it as the master template for your entire website
-
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import EmailGate from '@/components/EmailGate'
 
-// Metadata shown in browser tab and search engines
 export const metadata: Metadata = {
-  title: 'HoopMarket - NBA Stock Trading Platform',
-  description: 'Trade NBA player stocks based on real-time performance metrics',
+  title: 'HoopMarket — NBA Player Intelligence',
+  description: 'Player ratings, trends, and analysis powered by real NBA performance data',
 }
 
 export default function RootLayout({
@@ -19,10 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body>
-        {/* AuthProvider makes authentication available throughout the app */}
         <AuthProvider>
-          {/* This is where your page content will appear */}
-          {children}
+          <EmailGate>
+            {children}
+          </EmailGate>
         </AuthProvider>
       </body>
     </html>

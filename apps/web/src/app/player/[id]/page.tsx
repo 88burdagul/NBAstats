@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-// Force dynamic rendering (don't pre-render at build time)
 export const dynamic = 'force-dynamic'
 
 interface PlayerInfo {
@@ -38,22 +37,9 @@ interface ValuationData {
       rawImpactScore: number
     } | null
     recencyWeights: { weight: number; season: string; impactScore: number }[]
-    agingAdjustment: {
-      age: number
-      peakAgeRange: string
-      adjustmentPercent: number
-    }
-    fairAAVCalibration: {
-      method: string
-      medianSalary: number
-      topSalary: number
-      impactScoreToAAVSlope: number
-    }
-    stockIndexCalculation: {
-      surplusValue: number | null
-      percentileRank: number
-      trajectoryBonus: number
-    }
+    agingAdjustment: { age: number; peakAgeRange: string; adjustmentPercent: number }
+    fairAAVCalibration: { method: string; medianSalary: number; topSalary: number; impactScoreToAAVSlope: number }
+    stockIndexCalculation: { surplusValue: number | null; percentileRank: number; trajectoryBonus: number }
   }
 }
 
@@ -63,47 +49,37 @@ const calculateAge = (birthDate: string): number => {
   const birth = new Date(birthDate)
   let age = today.getFullYear() - birth.getFullYear()
   const monthDiff = today.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--
-  }
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
   return age
 }
 
 const formatCurrency = (value: number): string => {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`
-  }
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`
   return `$${value.toFixed(0)}`
 }
 
-const getTrajectoryInfo = (trajectory: string): { emoji: string; label: string; color: string } => {
+const getTrajectoryInfo = (trajectory: string) => {
   switch (trajectory) {
-    case 'rising':
-      return { emoji: '📈', label: 'Rising', color: 'text-primary' }
-    case 'declining':
-      return { emoji: '📉', label: 'Declining', color: 'text-market-red' }
-    case 'stable':
-      return { emoji: '➡️', label: 'Stable', color: 'text-text-muted' }
-    default:
-      return { emoji: '❓', label: 'Unknown', color: 'text-text-muted' }
+    case 'rising': return { label: 'Rising', color: 'text-positive' }
+    case 'declining': return { label: 'Declining', color: 'text-negative' }
+    case 'stable': return { label: 'Stable', color: 'text-text-secondary' }
+    default: return { label: 'Unknown', color: 'text-text-tertiary' }
   }
 }
 
-const getStockIndexColor = (index: number): string => {
-  if (index >= 70) return 'text-primary'
-  if (index >= 40) return 'text-yellow-400'
-  return 'text-market-red'
+const getIndexColor = (index: number): string => {
+  if (index >= 70) return 'text-positive'
+  if (index >= 40) return 'text-accent'
+  return 'text-negative'
 }
 
-const getStockIndexLabel = (index: number): string => {
-  if (index >= 80) return 'Elite Value'
-  if (index >= 60) return 'Great Value'
-  if (index >= 40) return 'Fair Value'
-  if (index >= 20) return 'Overpaid'
-  return 'Poor Value'
+const getIndexLabel = (index: number): string => {
+  if (index >= 80) return 'Elite'
+  if (index >= 60) return 'Great'
+  if (index >= 40) return 'Fair'
+  if (index >= 20) return 'Below Avg'
+  return 'Poor'
 }
 
 export default function PlayerDetailPage() {
@@ -128,17 +104,12 @@ export default function PlayerDetailPage() {
   const fetchValuationData = async () => {
     try {
       setValuationLoading(true)
-
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
       const response = await fetch(`${apiUrl}/api/player/${playerId}/valuation`)
       const data = await response.json()
-
-      if (data.success && data.valuation) {
-        setValuationData(data.valuation)
-      }
+      if (data.success && data.valuation) setValuationData(data.valuation)
     } catch (err) {
       console.error('Error fetching valuation data:', err)
-      // Silently fail - valuation is optional
     } finally {
       setValuationLoading(false)
     }
@@ -148,21 +119,15 @@ export default function PlayerDetailPage() {
     try {
       setLoading(true)
       setError('')
-
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
       const response = await fetch(`${apiUrl}/api/player/${playerId}/detail`)
       const data = await response.json()
-
-      if (data.success) {
-        setPlayerData(data.data)
-      } else {
-        setError('Failed to load player stock data')
-      }
-
+      if (data.success) setPlayerData(data.data)
+      else setError('Failed to load player data')
       setLoading(false)
     } catch (err) {
       console.error('Error fetching player data:', err)
-      setError('Failed to connect to market data.')
+      setError('Failed to connect to API.')
       setLoading(false)
     }
   }
@@ -172,7 +137,6 @@ export default function PlayerDetailPage() {
     const info = playerData.playerInfo[0]
     const headers = info.headers
     const data = info.rowSet[0]
-    
     return {
       name: data[headers.indexOf('DISPLAY_FIRST_LAST')],
       firstName: data[headers.indexOf('FIRST_NAME')],
@@ -191,7 +155,7 @@ export default function PlayerDetailPage() {
       teamAbbr: data[headers.indexOf('TEAM_ABBREVIATION')],
       draftYear: data[headers.indexOf('DRAFT_YEAR')],
       draftRound: data[headers.indexOf('DRAFT_ROUND')],
-      draftNumber: data[headers.indexOf('DRAFT_NUMBER')]
+      draftNumber: data[headers.indexOf('DRAFT_NUMBER')],
     }
   }
 
@@ -199,7 +163,6 @@ export default function PlayerDetailPage() {
     if (!playerData?.careerStats?.[0]) return []
     const stats = playerData.careerStats.find((rs: any) => rs.name === 'SeasonTotalsRegularSeason')
     if (!stats) return []
-    
     return stats.rowSet.map((row: any[]) => {
       const headers = stats.headers
       return {
@@ -216,7 +179,7 @@ export default function PlayerDetailPage() {
         blk: row[headers.indexOf('BLK')],
         fgPct: row[headers.indexOf('FG_PCT')],
         fg3Pct: row[headers.indexOf('FG3_PCT')],
-        ftPct: row[headers.indexOf('FT_PCT')]
+        ftPct: row[headers.indexOf('FT_PCT')],
       }
     }).reverse()
   }
@@ -224,7 +187,6 @@ export default function PlayerDetailPage() {
   const getRecentGames = () => {
     if (!playerData?.gameLog?.[0]) return []
     const gameLog = playerData.gameLog[0]
-    
     return gameLog.rowSet.slice(0, 10).map((row: any[]) => {
       const headers = gameLog.headers
       return {
@@ -242,52 +204,7 @@ export default function PlayerDetailPage() {
         fga: row[headers.indexOf('FGA')],
         fg3m: row[headers.indexOf('FG3M')],
         fg3a: row[headers.indexOf('FG3A')],
-        plusMinus: row[headers.indexOf('PLUS_MINUS')]
-      }
-    })
-  }
-
-  const getShotChartData = () => {
-    if (!playerData?.shotChart?.[0]) return { made: [], missed: [] }
-    const shotData = playerData.shotChart[0]
-    
-    const made: any[] = []
-    const missed: any[] = []
-    
-    shotData.rowSet.forEach((row: any[]) => {
-      const headers = shotData.headers
-      const shot = {
-        x: row[headers.indexOf('LOC_X')],
-        y: row[headers.indexOf('LOC_Y')],
-        made: row[headers.indexOf('SHOT_MADE_FLAG')] === 1,
-        distance: row[headers.indexOf('SHOT_DISTANCE')],
-        zone: row[headers.indexOf('SHOT_ZONE_BASIC')]
-      }
-      
-      if (shot.made) {
-        made.push(shot)
-      } else {
-        missed.push(shot)
-      }
-    })
-    
-    return { made, missed }
-  }
-
-  const getGeneralSplits = () => {
-    if (!playerData?.generalSplits?.[0]) return []
-    const splits = playerData.generalSplits[0]
-    
-    return splits.rowSet.map((row: any[]) => {
-      const headers = splits.headers
-      return {
-        groupValue: row[headers.indexOf('GROUP_VALUE')],
-        gp: row[headers.indexOf('GP')],
-        pts: row[headers.indexOf('PTS')],
-        reb: row[headers.indexOf('REB')],
-        ast: row[headers.indexOf('AST')],
-        fgPct: row[headers.indexOf('FG_PCT')],
-        fg3Pct: row[headers.indexOf('FG3_PCT')]
+        plusMinus: row[headers.indexOf('PLUS_MINUS')],
       }
     })
   }
@@ -295,31 +212,14 @@ export default function PlayerDetailPage() {
   const playerInfo = getPlayerInfo()
   const careerStats = getCareerStats()
   const recentGames = getRecentGames()
-  const shotChart = getShotChartData()
-  const splits = getGeneralSplits()
-
-  // Calculate stock metrics
   const latestSeason = careerStats[0]
-  const stockPrice = latestSeason ? (latestSeason.pts * 10) + (latestSeason.ast * 5) + (latestSeason.reb * 3) : 0
-  const priceChange = Math.random() * 40 - 15
-  const percentChange = stockPrice > 0 ? (priceChange / stockPrice) * 100 : 0
-  const marketCap = stockPrice * (latestSeason?.gp || 1) * 1000000
-  const perIndex = latestSeason ? ((latestSeason.pts + latestSeason.reb + latestSeason.ast) / 3).toFixed(1) : '0'
-  const volatility = Math.abs(percentChange) < 5 ? 'Low' : Math.abs(percentChange) < 10 ? 'Medium' : 'High'
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-background-dark py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-20">
-            <div className="relative inline-block">
-              <div className="animate-spin rounded-full h-24 w-24 border-b-8 border-primary mx-auto glow-green"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-4xl">📊</span>
-              </div>
-            </div>
-            <p className="text-primary mt-6 font-black text-xl">LOADING STOCK ANALYSIS...</p>
-          </div>
+      <main className="min-h-screen bg-surface-0 flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="w-10 h-10 border-2 border-surface-3 border-t-accent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-text-secondary">Loading player</p>
         </div>
       </main>
     )
@@ -327,524 +227,322 @@ export default function PlayerDetailPage() {
 
   if (error || !playerInfo) {
     return (
-      <main className="min-h-screen bg-background-dark py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="mb-6 px-4 py-2 bg-primary text-background-dark font-bold rounded-lg hover:bg-primary/80 transition-all"
-          >
-            ← Back to Market
+      <main className="min-h-screen bg-surface-0 flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <p className="text-text-primary font-semibold mb-4">{error || 'Player not found'}</p>
+          <button onClick={() => router.back()}
+            className="px-5 py-2.5 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent-dim transition-colors">
+            Go back
           </button>
-          <div className="bg-market-red/20 border-2 border-market-red rounded-2xl p-8">
-            <p className="text-white font-black text-xl">{error || 'Stock not found'}</p>
-          </div>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-background-dark">
-      {/* Top Navigation */}
-      <header className="flex items-center justify-between border-b border-border-dark px-10 py-3 bg-background-dark sticky top-0 z-50">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-4">
-            <div className="text-primary text-2xl">📈</div>
-            <h2 className="text-white text-lg font-bold leading-tight tracking-tight">HoopMarket</h2>
+    <main className="min-h-screen bg-surface-0">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-6 md:px-10 py-4 border-b border-border">
+        <div className="flex items-center gap-10">
+          <button onClick={() => router.push('/')} className="text-accent text-xl font-extrabold tracking-tight">HOOPMARKET</button>
+          <div className="hidden md:flex items-center gap-1">
+            {[{ l: 'Players', h: '/' }, { l: 'Teams', h: '/teams' }, { l: 'Compare', h: '/compare' }, { l: 'Games', h: '/games' }, { l: 'Reports', h: '/reports' }].map(link => (
+              <button key={link.h} onClick={() => router.push(link.h)}
+                className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary rounded-lg transition-colors">
+                {link.l}
+              </button>
+            ))}
           </div>
-          <nav className="flex items-center gap-9">
-            <button onClick={() => router.push('/')} className="text-text-muted hover:text-white text-sm font-medium transition-colors">Dashboard</button>
-            <button onClick={() => router.push('/teams')} className="text-white text-sm font-medium">Teams</button>
-            <button onClick={() => router.push('/compare')} className="text-text-muted hover:text-white text-sm font-medium transition-colors">Screener</button>
-          </nav>
         </div>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2 bg-border-dark text-white hover:bg-border-dark/80 rounded-lg transition-all"
-        >
-          ← Back
+        <button onClick={() => router.back()}
+          className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+          Back
         </button>
-      </header>
+      </nav>
 
-      <div className="max-w-[1440px] mx-auto w-full px-6 py-8">
-        {/* Breadcrumbs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => router.push('/')} className="text-text-muted text-sm font-medium hover:text-primary transition-colors">NBA Market</button>
-          <span className="text-text-muted text-sm font-medium">/</span>
-          <span className="text-white text-sm font-medium">{playerInfo.name}</span>
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-text-tertiary mb-8 animate-fade-in">
+          <button onClick={() => router.push('/')} className="hover:text-accent transition-colors">Players</button>
+          <span>/</span>
+          <span className="text-text-primary">{playerInfo.name}</span>
         </div>
 
-        {/* Profile Header */}
-        <div className="flex flex-col mb-8">
-          <div className="flex w-full flex-col gap-6 lg:flex-row lg:justify-between lg:items-center bg-card-dark p-6 rounded-xl border border-border-dark">
-            <div className="flex gap-6 items-center">
-              <img
-                src={`https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`}
-                alt={playerInfo.name}
-                className="bg-background-dark rounded-xl min-h-32 w-32 border-2 border-primary object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.display = 'none'
-                }}
-              />
-              <div className="flex flex-col">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-white text-3xl font-bold leading-tight tracking-tight">{playerInfo.name}</h1>
-                  <span className="bg-primary/20 text-primary text-xs font-bold px-2 py-1 rounded uppercase">{volatility} Vol</span>
-                </div>
-                <p className="text-text-muted text-lg font-medium">{playerInfo.teamName} · {playerInfo.position} · #{playerInfo.jersey}</p>
-                <div className="mt-2 flex items-center gap-4">
-                  <div>
-                    <p className="text-text-muted text-xs uppercase tracking-wider">Current Stock Price</p>
-                    <p className="text-white text-2xl font-bold">
-                      ${stockPrice.toFixed(2)} 
-                      <span className={`text-sm font-medium ml-1 ${percentChange >= 0 ? 'text-primary' : 'text-market-red'}`}>
-                        {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}% today
-                      </span>
-                    </p>
-                  </div>
-                  <div className="h-10 w-[1px] bg-border-dark"></div>
-                  <div>
-                    <p className="text-text-muted text-xs uppercase tracking-wider">Market Sentiment</p>
-                    <p className="text-primary text-sm font-bold flex items-center gap-1">
-                      ⚡ {percentChange >= 0 ? 'STRONG BUY' : 'HOLD'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex w-full max-w-[320px] gap-3">
-              <button className="flex-1 flex items-center justify-center rounded-lg h-12 px-6 bg-border-dark text-white text-base font-bold hover:bg-border-dark/80 transition-all">
-                Sell Share
-              </button>
-              <button className="flex-1 flex items-center justify-center rounded-lg h-12 px-6 bg-primary text-background-dark text-base font-bold hover:bg-primary/80 transition-all">
-                Buy Share
-              </button>
-            </div>
+        {/* Hero */}
+        <div className="flex flex-col md:flex-row gap-8 mb-12 animate-fade-up">
+          <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-surface-2 shrink-0">
+            <img
+              src={`https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`}
+              alt={playerInfo.name}
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
           </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="flex flex-col gap-2 rounded-xl p-5 border border-border-dark bg-card-dark/40">
-            <div className="flex justify-between items-start">
-              <p className="text-text-muted text-sm font-medium">Market Cap</p>
-              <span className="text-primary text-lg">💰</span>
+          <div className="flex flex-col justify-center">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-label text-accent uppercase">{playerInfo.teamName}</span>
+              <span className="text-text-tertiary">·</span>
+              <span className="text-label text-text-tertiary uppercase">#{playerInfo.jersey} · {playerInfo.position}</span>
             </div>
-            <p className="text-white text-2xl font-bold">${(marketCap / 1000000).toFixed(1)}M</p>
-            <p className="text-primary text-xs font-medium flex items-center gap-1">
-              🔼 Top tier asset
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-xl p-5 border border-border-dark bg-card-dark/40">
-            <div className="flex justify-between items-start">
-              <p className="text-text-muted text-sm font-medium">PER Index</p>
-              <span className="text-primary text-lg">📊</span>
-            </div>
-            <p className="text-white text-2xl font-bold">{perIndex}</p>
-            <p className="text-primary text-xs font-medium flex items-center gap-1">
-              ↑ Elite performer
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-xl p-5 border border-border-dark bg-card-dark/40">
-            <div className="flex justify-between items-start">
-              <p className="text-text-muted text-sm font-medium">Volatility</p>
-              <span className="text-primary text-lg">📈</span>
-            </div>
-            <p className="text-white text-2xl font-bold">{volatility}</p>
-            <p className="text-text-muted text-xs font-medium italic">Consistency rated</p>
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-xl p-5 border border-border-dark bg-card-dark/40">
-            <div className="flex justify-between items-start">
-              <p className="text-text-muted text-sm font-medium">Daily Volume</p>
-              <span className="text-primary text-lg">🔄</span>
-            </div>
-            <p className="text-white text-2xl font-bold">{latestSeason ? (latestSeason.gp * 12500).toLocaleString() : '0'}</p>
-            <p className="text-primary text-xs font-medium flex items-center gap-1">
-              📈 High activity
-            </p>
-          </div>
-        </div>
-
-        {/* Main Dashboard Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Chart Column */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Performance Chart */}
-            <div className="bg-card-dark border border-border-dark rounded-xl p-6">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-white text-xl font-bold">Performance Stock Chart</h3>
-                  <p className="text-text-muted text-sm">Career progression index</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="px-3 py-1 rounded text-xs font-bold bg-border-dark text-white">1W</button>
-                  <button className="px-3 py-1 rounded text-xs font-bold bg-primary text-background-dark">Career</button>
-                </div>
-              </div>
-
-              {/* Career Chart */}
-              {careerStats.length > 0 && (
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={careerStats.slice().reverse()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#234836" />
-                    <XAxis
-                      dataKey="season"
-                      tick={{ fill: '#92c9ad', fontSize: 10 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis tick={{ fill: '#92c9ad' }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#162e22', border: '1px solid #234836', borderRadius: '8px' }}
-                      labelStyle={{ color: '#13ec80', fontWeight: 'bold' }}
-                    />
-                    <Legend wrapperStyle={{ color: '#FFF' }} />
-                    <Line type="monotone" dataKey="pts" stroke="#13ec80" strokeWidth={3} name="Points" dot={{ fill: '#13ec80', r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+            <h1 className="text-display text-text-primary mb-4">{playerInfo.name}</h1>
+            <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm text-text-secondary">
+              <span>{playerInfo.height} · {playerInfo.weight} lbs</span>
+              <span>Age {playerInfo.age}</span>
+              <span>{playerInfo.experience} yrs exp</span>
+              {playerInfo.school && <span>{playerInfo.school}</span>}
+              {playerInfo.draftYear !== 'Undrafted' && (
+                <span>{playerInfo.draftYear} Draft · Rd {playerInfo.draftRound}, #{playerInfo.draftNumber}</span>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Market Fundamentals */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-card-dark border border-border-dark rounded-xl p-5">
-                <h4 className="text-text-muted text-xs uppercase font-bold tracking-widest mb-1">Points Per Game</h4>
-                <p className="text-white text-2xl font-bold">{latestSeason?.pts.toFixed(1) || '0'}</p>
-                <div className="w-full bg-border-dark h-1 rounded-full mt-2">
-                  <div className="bg-primary h-full rounded-full" style={{ width: `${Math.min((latestSeason?.pts || 0) / 35 * 100, 100)}%` }}></div>
-                </div>
+        {/* Season Stats */}
+        {latestSeason && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-px bg-border rounded-2xl overflow-hidden mb-12 animate-fade-up stagger-1" style={{ opacity: 0 }}>
+            {[
+              { label: 'PPG', value: latestSeason.pts.toFixed(1), highlight: true },
+              { label: 'RPG', value: latestSeason.reb.toFixed(1) },
+              { label: 'APG', value: latestSeason.ast.toFixed(1) },
+              { label: 'FG%', value: `${(latestSeason.fgPct * 100).toFixed(1)}` },
+              { label: '3P%', value: `${(latestSeason.fg3Pct * 100).toFixed(1)}` },
+              { label: 'GP', value: latestSeason.gp },
+              { label: 'MPG', value: latestSeason.min.toFixed(1) },
+            ].map(stat => (
+              <div key={stat.label} className="bg-surface-1 p-5 text-center">
+                <p className="text-label text-text-tertiary uppercase mb-2">{stat.label}</p>
+                <p className={`stat-num text-stat ${stat.highlight ? 'text-accent' : 'text-text-primary'}`}>{stat.value}</p>
               </div>
-              <div className="bg-card-dark border border-border-dark rounded-xl p-5">
-                <h4 className="text-text-muted text-xs uppercase font-bold tracking-widest mb-1">Assists Per Game</h4>
-                <p className="text-white text-2xl font-bold">{latestSeason?.ast.toFixed(1) || '0'}</p>
-                <div className="w-full bg-border-dark h-1 rounded-full mt-2">
-                  <div className="bg-primary h-full rounded-full" style={{ width: `${Math.min((latestSeason?.ast || 0) / 12 * 100, 100)}%` }}></div>
-                </div>
-              </div>
-              <div className="bg-card-dark border border-border-dark rounded-xl p-5">
-                <h4 className="text-text-muted text-xs uppercase font-bold tracking-widest mb-1">Rebounds Per Game</h4>
-                <p className="text-white text-2xl font-bold">{latestSeason?.reb.toFixed(1) || '0'}</p>
-                <div className="w-full bg-border-dark h-1 rounded-full mt-2">
-                  <div className="bg-primary h-full rounded-full" style={{ width: `${Math.min((latestSeason?.reb || 0) / 15 * 100, 100)}%` }}></div>
-                </div>
-              </div>
-            </div>
+            ))}
+          </div>
+        )}
 
-            {/* Recent Games (Trading History) */}
-            <div className="bg-card-dark border border-border-dark rounded-xl p-6">
-              <h3 className="text-white text-xl font-bold mb-4">Recent Trading History</h3>
-              <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide">
-                {recentGames.map((game: any, index: number) => (
-                  <div key={index} className={`bg-background-dark border ${game.result === 'W' ? 'border-primary' : 'border-market-red'} rounded-xl p-4`}>
-                    <div className="flex justify-between items-start mb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main column */}
+          <div className="lg:col-span-2 space-y-8">
+
+            {/* Career Chart */}
+            {careerStats.length > 0 && (
+              <div className="bg-surface-1 border border-border rounded-2xl p-6 animate-fade-up stagger-2" style={{ opacity: 0 }}>
+                <h2 className="text-title text-text-primary mb-6">Career Progression</h2>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={careerStats.slice().reverse()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2E" />
+                    <XAxis dataKey="season" tick={{ fill: '#8E8E93', fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis tick={{ fill: '#8E8E93', fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1A1A1D', border: '1px solid #2A2A2E', borderRadius: '12px', fontSize: '13px' }}
+                      labelStyle={{ color: '#FF6B00', fontWeight: '600' }}
+                    />
+                    <Line type="monotone" dataKey="pts" stroke="#FF6B00" strokeWidth={2.5} name="PPG" dot={{ fill: '#FF6B00', r: 3 }} />
+                    <Line type="monotone" dataKey="ast" stroke="#8E8E93" strokeWidth={1.5} name="APG" dot={false} />
+                    <Line type="monotone" dataKey="reb" stroke="#5A5A5E" strokeWidth={1.5} name="RPG" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Recent Games */}
+            {recentGames.length > 0 && (
+              <div className="animate-fade-up stagger-3" style={{ opacity: 0 }}>
+                <h2 className="text-title text-text-primary mb-4">Last 10 Games</h2>
+                <div className="bg-surface-1 border border-border rounded-2xl overflow-hidden">
+                  <div className="hidden md:grid grid-cols-[1fr_50px_50px_50px_50px_70px_50px] gap-2 px-5 py-3 text-label text-text-tertiary uppercase border-b border-border">
+                    <span>Game</span>
+                    <span className="text-right">PTS</span>
+                    <span className="text-right">REB</span>
+                    <span className="text-right">AST</span>
+                    <span className="text-right">MIN</span>
+                    <span className="text-right">FG</span>
+                    <span className="text-right">+/-</span>
+                  </div>
+                  {recentGames.map((game: any, i: number) => (
+                    <div key={i} className="hover-row grid grid-cols-[1fr_auto] md:grid-cols-[1fr_50px_50px_50px_50px_70px_50px] gap-2 items-center px-5 py-3 border-b border-border/50">
                       <div>
-                        <div className="font-bold text-white text-sm">{game.matchup}</div>
-                        <div className="text-xs text-text-muted">{new Date(game.date).toLocaleDateString()}</div>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${game.result === 'W' ? 'bg-positive' : 'bg-negative'}`} />
+                          <span className="text-sm font-medium text-text-primary">{game.matchup}</span>
+                        </div>
+                        <span className="text-xs text-text-tertiary ml-3.5">{new Date(game.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                       </div>
-                      <div className={`px-3 py-1 rounded-full font-black text-sm ${game.result === 'W' ? 'bg-primary text-background-dark' : 'bg-market-red text-white'}`}>
-                        {game.result}
+                      <div className="flex md:hidden items-center gap-3 text-sm">
+                        <span className="stat-num font-bold text-accent">{game.pts}</span>
+                        <span className="stat-num text-text-secondary">{game.reb}</span>
+                        <span className="stat-num text-text-secondary">{game.ast}</span>
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <div className="text-xl font-black text-white">{game.pts}</div>
-                        <div className="text-xs text-text-muted">PTS</div>
-                      </div>
-                      <div>
-                        <div className="text-xl font-black text-white">{game.reb}</div>
-                        <div className="text-xs text-text-muted">REB</div>
-                      </div>
-                      <div>
-                        <div className="text-xl font-black text-white">{game.ast}</div>
-                        <div className="text-xs text-text-muted">AST</div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2 text-xs text-text-muted flex justify-between">
-                      <span>{game.fgm}/{game.fga} FG</span>
-                      <span>{game.fg3m}/{game.fg3a} 3PT</span>
-                      <span className={game.plusMinus >= 0 ? 'text-primary' : 'text-market-red'}>
+                      <span className="hidden md:block stat-num text-sm font-bold text-accent text-right">{game.pts}</span>
+                      <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{game.reb}</span>
+                      <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{game.ast}</span>
+                      <span className="hidden md:block stat-num text-sm text-text-tertiary text-right">{game.min}</span>
+                      <span className="hidden md:block stat-num text-xs text-text-tertiary text-right">{game.fgm}/{game.fga}</span>
+                      <span className={`hidden md:block stat-num text-sm text-right font-medium ${game.plusMinus >= 0 ? 'text-positive' : 'text-negative'}`}>
                         {game.plusMinus >= 0 ? '+' : ''}{game.plusMinus}
                       </span>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Career Stats Table */}
+            {careerStats.length > 0 && (
+              <div className="animate-fade-up stagger-4" style={{ opacity: 0 }}>
+                <h2 className="text-title text-text-primary mb-4">Career Stats</h2>
+                <div className="bg-surface-1 border border-border rounded-2xl overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 text-label text-text-tertiary uppercase">Season</th>
+                        <th className="text-left py-3 px-4 text-label text-text-tertiary uppercase">Team</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">GP</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">MIN</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">PTS</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">REB</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">AST</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">FG%</th>
+                        <th className="text-center py-3 px-4 text-label text-text-tertiary uppercase">3P%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {careerStats.map((season: any, i: number) => (
+                        <tr key={i} className="hover-row border-b border-border/50">
+                          <td className="py-3 px-4 stat-num text-text-primary font-medium">{season.season}</td>
+                          <td className="py-3 px-4 text-text-secondary">{season.team}</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-tertiary">{season.gp}</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-tertiary">{season.min.toFixed(1)}</td>
+                          <td className="py-3 px-4 text-center stat-num text-accent font-semibold">{season.pts.toFixed(1)}</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-primary">{season.reb.toFixed(1)}</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-primary">{season.ast.toFixed(1)}</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-tertiary">{(season.fgPct * 100).toFixed(1)}%</td>
+                          <td className="py-3 px-4 text-center stat-num text-text-tertiary">{(season.fg3Pct * 100).toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
 
-            {/* Player Evaluation Card */}
+            {/* Evaluation Card */}
             {valuationLoading ? (
-              <div className="bg-card-dark border border-border-dark rounded-xl p-6">
+              <div className="bg-surface-1 border border-border rounded-2xl p-6">
                 <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-border-dark rounded w-1/2"></div>
-                  <div className="h-20 bg-border-dark rounded"></div>
-                  <div className="h-4 bg-border-dark rounded w-3/4"></div>
+                  <div className="h-5 bg-surface-3 rounded w-1/2" />
+                  <div className="h-16 bg-surface-3 rounded" />
+                  <div className="h-4 bg-surface-3 rounded w-3/4" />
                 </div>
               </div>
             ) : valuationData ? (
-              <div className="bg-card-dark border-2 border-primary rounded-xl p-6">
-                <h3 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
-                  <span>💎</span> Player Evaluation
-                </h3>
+              <div className="bg-surface-1 border border-accent/30 rounded-2xl p-6 animate-fade-up stagger-1" style={{ opacity: 0 }}>
+                <h3 className="text-title text-text-primary mb-5">Player Evaluation</h3>
 
-                {/* Stock Index - Big Display */}
                 <div className="text-center mb-6">
-                  <div className={`text-5xl font-black ${getStockIndexColor(valuationData.stockIndex)}`}>
+                  <p className={`stat-num text-5xl font-extrabold ${getIndexColor(valuationData.stockIndex)}`}>
                     {valuationData.stockIndex.toFixed(0)}
-                  </div>
-                  <div className="text-text-muted text-sm font-medium mt-1">Stock Index</div>
-                  <div className={`text-sm font-bold mt-1 ${getStockIndexColor(valuationData.stockIndex)}`}>
-                    {getStockIndexLabel(valuationData.stockIndex)}
-                  </div>
+                  </p>
+                  <p className={`text-sm font-semibold mt-1 ${getIndexColor(valuationData.stockIndex)}`}>
+                    {getIndexLabel(valuationData.stockIndex)}
+                  </p>
                 </div>
 
-                {/* Trajectory */}
-                <div className="flex justify-center items-center gap-2 mb-6">
-                  <span className="text-2xl">{getTrajectoryInfo(valuationData.trajectory).emoji}</span>
-                  <span className={`font-bold ${getTrajectoryInfo(valuationData.trajectory).color}`}>
+                <div className="flex justify-center mb-6">
+                  <span className={`text-sm font-semibold ${getTrajectoryInfo(valuationData.trajectory).color}`}>
                     {getTrajectoryInfo(valuationData.trajectory).label} Trajectory
                   </span>
                 </div>
 
-                {/* AAV Comparison */}
-                <div className="space-y-3 mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-muted text-sm">Fair Market AAV</span>
-                    <span className="text-primary font-bold">{formatCurrency(valuationData.fairAAV)}</span>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Fair Market AAV</span>
+                    <span className="stat-num text-accent font-semibold">{formatCurrency(valuationData.fairAAV)}</span>
                   </div>
-
-                  {valuationData.actualAAV !== null ? (
+                  {valuationData.actualAAV !== null && (
                     <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-text-muted text-sm">Actual AAV</span>
-                        <span className="text-white font-bold">{formatCurrency(valuationData.actualAAV)}</span>
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">Actual AAV</span>
+                        <span className="stat-num text-text-primary font-semibold">{formatCurrency(valuationData.actualAAV)}</span>
                       </div>
-                      <div className="h-px bg-border-dark"></div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-text-muted text-sm">Surplus Value</span>
-                        <span className={`font-bold ${valuationData.surplusValue && valuationData.surplusValue >= 0 ? 'text-primary' : 'text-market-red'}`}>
-                          {valuationData.surplusValue && valuationData.surplusValue >= 0 ? '+' : ''}
-                          {formatCurrency(valuationData.surplusValue || 0)}
+                      <div className="divider" />
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">Surplus Value</span>
+                        <span className={`stat-num font-semibold ${valuationData.surplusValue && valuationData.surplusValue >= 0 ? 'text-positive' : 'text-negative'}`}>
+                          {valuationData.surplusValue && valuationData.surplusValue >= 0 ? '+' : ''}{formatCurrency(valuationData.surplusValue || 0)}
                         </span>
                       </div>
                     </>
-                  ) : (
-                    <div className="text-text-muted text-sm italic text-center py-2 bg-border-dark/30 rounded-lg">
-                      Salary data unavailable
-                    </div>
                   )}
                 </div>
 
-                {/* Impact Score */}
-                <div className="bg-background-dark rounded-lg p-3 mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-muted text-xs uppercase tracking-wider">Impact Score</span>
-                    <span className="text-white font-bold">{valuationData.adjustedImpactScore.toFixed(1)}</span>
+                <div className="mt-5 bg-surface-2 rounded-xl p-4">
+                  <div className="flex justify-between items-center text-sm mb-2">
+                    <span className="text-text-tertiary">Impact Score</span>
+                    <span className="stat-num text-text-primary font-semibold">{valuationData.adjustedImpactScore.toFixed(1)}</span>
                   </div>
-                  <div className="w-full bg-border-dark h-2 rounded-full mt-2">
-                    <div
-                      className="bg-primary h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min((valuationData.adjustedImpactScore / 25) * 100, 100)}%` }}
-                    ></div>
+                  <div className="w-full bg-surface-3 h-1.5 rounded-full">
+                    <div className="bg-accent h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min((valuationData.adjustedImpactScore / 25) * 100, 100)}%` }} />
                   </div>
                 </div>
 
-                {/* Why This Rating - Collapsible */}
-                <button
-                  onClick={() => setShowExplanation(!showExplanation)}
-                  className="w-full text-left text-sm text-text-muted hover:text-white transition-colors flex items-center justify-between"
-                >
-                  <span>Why this rating?</span>
-                  <span className="transform transition-transform duration-200" style={{ transform: showExplanation ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                    ▼
-                  </span>
+                <button onClick={() => setShowExplanation(!showExplanation)}
+                  className="mt-4 w-full text-left text-sm text-text-tertiary hover:text-text-secondary transition-colors flex items-center justify-between">
+                  <span>How is this calculated?</span>
+                  <span className="transition-transform duration-200" style={{ transform: showExplanation ? 'rotate(180deg)' : '' }}>▾</span>
                 </button>
 
                 {showExplanation && (
-                  <div className="mt-4 pt-4 border-t border-border-dark space-y-4 text-xs">
-                    {/* Current Season Breakdown */}
+                  <div className="mt-4 pt-4 border-t border-border space-y-4 text-xs text-text-tertiary">
                     {valuationData.explanationBreakdown.currentSeasonBreakdown && (
                       <div>
-                        <h4 className="text-primary font-bold mb-2">Per-36 Stats (Current Season)</h4>
-                        <div className="grid grid-cols-2 gap-2 text-text-muted">
-                          <div>PTS: {valuationData.explanationBreakdown.currentSeasonBreakdown.pointsPer36.toFixed(1)}</div>
-                          <div>AST: {valuationData.explanationBreakdown.currentSeasonBreakdown.assistsPer36.toFixed(1)}</div>
-                          <div>REB: {valuationData.explanationBreakdown.currentSeasonBreakdown.reboundsPer36.toFixed(1)}</div>
-                          <div>STL: {valuationData.explanationBreakdown.currentSeasonBreakdown.stealsPer36.toFixed(1)}</div>
-                          <div>BLK: {valuationData.explanationBreakdown.currentSeasonBreakdown.blocksPer36.toFixed(1)}</div>
-                          <div>TS%: {(valuationData.explanationBreakdown.currentSeasonBreakdown.trueShootingPct * 100).toFixed(1)}%</div>
+                        <h4 className="text-accent font-semibold mb-2">Per-36 Stats</h4>
+                        <div className="grid grid-cols-2 gap-1">
+                          <span>PTS: {valuationData.explanationBreakdown.currentSeasonBreakdown.pointsPer36.toFixed(1)}</span>
+                          <span>AST: {valuationData.explanationBreakdown.currentSeasonBreakdown.assistsPer36.toFixed(1)}</span>
+                          <span>REB: {valuationData.explanationBreakdown.currentSeasonBreakdown.reboundsPer36.toFixed(1)}</span>
+                          <span>TS%: {(valuationData.explanationBreakdown.currentSeasonBreakdown.trueShootingPct * 100).toFixed(1)}%</span>
                         </div>
                       </div>
                     )}
-
-                    {/* Recency Weights */}
-                    {valuationData.explanationBreakdown.recencyWeights.length > 0 && (
-                      <div>
-                        <h4 className="text-primary font-bold mb-2">Season Weights</h4>
-                        <div className="space-y-1 text-text-muted">
-                          {valuationData.explanationBreakdown.recencyWeights.map((sw, i) => (
-                            <div key={i} className="flex justify-between">
-                              <span>{sw.season}</span>
-                              <span>{(sw.weight * 100).toFixed(0)}% weight → {sw.impactScore.toFixed(1)} score</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Age Adjustment */}
                     <div>
-                      <h4 className="text-primary font-bold mb-2">Age Adjustment</h4>
-                      <div className="text-text-muted">
-                        <div>Age: {valuationData.explanationBreakdown.agingAdjustment.age}</div>
-                        <div>Peak Range: {valuationData.explanationBreakdown.agingAdjustment.peakAgeRange}</div>
-                        <div className={valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent >= 0 ? 'text-primary' : 'text-market-red'}>
-                          Adjustment: {valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent >= 0 ? '+' : ''}
-                          {valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Model Weights */}
-                    <div>
-                      <h4 className="text-primary font-bold mb-2">Impact Score Weights</h4>
-                      <div className="grid grid-cols-2 gap-1 text-text-muted">
-                        <div>Points: {(valuationData.explanationBreakdown.impactScoreWeights.pointsPer36 * 100).toFixed(0)}%</div>
-                        <div>Assists: {(valuationData.explanationBreakdown.impactScoreWeights.assistsPer36 * 100).toFixed(0)}%</div>
-                        <div>Rebounds: {(valuationData.explanationBreakdown.impactScoreWeights.reboundsPer36 * 100).toFixed(0)}%</div>
-                        <div>Steals: {(valuationData.explanationBreakdown.impactScoreWeights.stealsPer36 * 100).toFixed(0)}%</div>
-                        <div>Blocks: {(valuationData.explanationBreakdown.impactScoreWeights.blocksPer36 * 100).toFixed(0)}%</div>
-                        <div>TS%: {(valuationData.explanationBreakdown.impactScoreWeights.trueShootingPct * 100).toFixed(0)}%</div>
-                      </div>
+                      <h4 className="text-accent font-semibold mb-2">Age Factor</h4>
+                      <span>Age {valuationData.explanationBreakdown.agingAdjustment.age} · Peak: {valuationData.explanationBreakdown.agingAdjustment.peakAgeRange} · </span>
+                      <span className={valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent >= 0 ? 'text-positive' : 'text-negative'}>
+                        {valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent >= 0 ? '+' : ''}{valuationData.explanationBreakdown.agingAdjustment.adjustmentPercent.toFixed(1)}%
+                      </span>
                     </div>
                   </div>
                 )}
               </div>
             ) : null}
 
-            {/* Bio Panel */}
-            <div className="bg-card-dark border border-border-dark rounded-xl p-6">
-              <h3 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
-                <span>📋</span> Stock Details
-              </h3>
+            {/* Bio */}
+            <div className="bg-surface-1 border border-border rounded-2xl p-6 animate-fade-up stagger-2" style={{ opacity: 0 }}>
+              <h3 className="text-title text-text-primary mb-4">Details</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Age</span>
-                  <span className="text-white font-bold">{playerInfo.age}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Experience</span>
-                  <span className="text-white font-bold">{playerInfo.experience} years</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Height</span>
-                  <span className="text-white font-bold">{playerInfo.height}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Weight</span>
-                  <span className="text-white font-bold">{playerInfo.weight} lbs</span>
-                </div>
-                {playerInfo.school && (
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">College</span>
-                    <span className="text-white font-bold text-right">{playerInfo.school}</span>
+                {[
+                  ['Age', playerInfo.age],
+                  ['Experience', `${playerInfo.experience} years`],
+                  ['Height', playerInfo.height],
+                  ['Weight', `${playerInfo.weight} lbs`],
+                  ...(playerInfo.school ? [['College', playerInfo.school]] : []),
+                  ['Country', playerInfo.country],
+                  ...(playerInfo.draftYear !== 'Undrafted' ? [['Draft', `${playerInfo.draftYear} Rd ${playerInfo.draftRound}, #${playerInfo.draftNumber}`]] : []),
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex justify-between">
+                    <span className="text-text-tertiary">{label}</span>
+                    <span className="text-text-primary font-medium text-right">{value}</span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-text-muted">From</span>
-                  <span className="text-white font-bold">{playerInfo.country}</span>
-                </div>
-                {playerInfo.draftYear !== 'Undrafted' && (
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Draft</span>
-                    <span className="text-white font-bold text-right">
-                      {playerInfo.draftYear} Rd {playerInfo.draftRound}, #{playerInfo.draftNumber}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Risk Panel */}
-            <div className="p-4 rounded-lg bg-border-dark/20 border border-border-dark">
-              <div className="flex gap-2 text-text-muted">
-                <span>ℹ️</span>
-                <p className="text-xs leading-relaxed">
-                  This is a simulated stock market for entertainment. Stock prices are calculated using performance metrics and statistical algorithms.
-                </p>
+                ))}
               </div>
             </div>
           </div>
         </div>
-
-        {/* Career Stats Table */}
-        {careerStats.length > 0 && (
-          <div className="mt-8 bg-card-dark border border-border-dark rounded-xl p-6">
-            <h2 className="text-white text-xl font-bold mb-6 flex items-center gap-2">
-              <span>📊</span> Historical Performance Data
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-background-dark border-b-2 border-primary">
-                  <tr>
-                    <th className="text-left py-3 px-4 text-primary font-black">SEASON</th>
-                    <th className="text-left py-3 px-4 text-primary font-black">TEAM</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">GP</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">MIN</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">PTS</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">REB</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">AST</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">FG%</th>
-                    <th className="text-center py-3 px-4 text-primary font-black">3P%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {careerStats.map((season: any, index: number) => (
-                    <tr key={index} className="border-b border-border-dark hover:bg-border-dark/30 transition-colors">
-                      <td className="py-3 px-4 text-white font-bold">{season.season}</td>
-                      <td className="py-3 px-4 text-white font-bold">{season.team}</td>
-                      <td className="py-3 px-4 text-center text-text-muted">{season.gp}</td>
-                      <td className="py-3 px-4 text-center text-text-muted">{season.min.toFixed(1)}</td>
-                      <td className="py-3 px-4 text-center text-primary font-bold">{season.pts.toFixed(1)}</td>
-                      <td className="py-3 px-4 text-center text-white font-bold">{season.reb.toFixed(1)}</td>
-                      <td className="py-3 px-4 text-center text-white font-bold">{season.ast.toFixed(1)}</td>
-                      <td className="py-3 px-4 text-center text-text-muted">{(season.fgPct * 100).toFixed(1)}%</td>
-                      <td className="py-3 px-4 text-center text-text-muted">{(season.fg3Pct * 100).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Footer */}
-      <footer className="mt-12 border-t border-border-dark py-8">
-        <div className="max-w-[1440px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="text-primary text-2xl">📈</div>
-            <p className="text-text-muted text-sm">© 2026 HoopMarket. Data powered by NBA Stats API.</p>
-          </div>
-          <div className="flex gap-8">
-            <button onClick={() => router.push('/')} className="text-text-muted text-sm hover:text-white transition-colors">Market Dashboard</button>
-            <button onClick={() => router.push('/teams')} className="text-text-muted text-sm hover:text-white transition-colors">Teams</button>
-            <button onClick={() => router.push('/compare')} className="text-text-muted text-sm hover:text-white transition-colors">Compare</button>
-          </div>
-        </div>
-      </footer>
     </main>
   )
 }

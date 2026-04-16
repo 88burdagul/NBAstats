@@ -3,66 +3,28 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Force dynamic rendering (don't pre-render at build time)
 export const dynamic = 'force-dynamic'
 
-// Static list of current NBA teams with abbreviations for logo URLs
-const NBA_TEAMS_MAP: Record<string, { abbr: string, color: string }> = {
-  '1610612737': { abbr: 'ATL', color: '#E03A3E' },
-  '1610612738': { abbr: 'BOS', color: '#007A33' },
-  '1610612751': { abbr: 'BKN', color: '#000000' },
-  '1610612766': { abbr: 'CHA', color: '#1D1160' },
-  '1610612741': { abbr: 'CHI', color: '#CE1141' },
-  '1610612739': { abbr: 'CLE', color: '#860038' },
-  '1610612742': { abbr: 'DAL', color: '#00538C' },
-  '1610612743': { abbr: 'DEN', color: '#0E2240' },
-  '1610612765': { abbr: 'DET', color: '#C8102E' },
-  '1610612744': { abbr: 'GSW', color: '#1D428A' },
-  '1610612745': { abbr: 'HOU', color: '#CE1141' },
-  '1610612754': { abbr: 'IND', color: '#002D62' },
-  '1610612746': { abbr: 'LAC', color: '#C8102E' },
-  '1610612747': { abbr: 'LAL', color: '#552583' },
-  '1610612763': { abbr: 'MEM', color: '#5D76A9' },
-  '1610612748': { abbr: 'MIA', color: '#98002E' },
-  '1610612749': { abbr: 'MIL', color: '#00471B' },
-  '1610612750': { abbr: 'MIN', color: '#0C2340' },
-  '1610612740': { abbr: 'NOP', color: '#0C2340' },
-  '1610612752': { abbr: 'NYK', color: '#006BB6' },
-  '1610612760': { abbr: 'OKC', color: '#007AC1' },
-  '1610612753': { abbr: 'ORL', color: '#0077C0' },
-  '1610612755': { abbr: 'PHI', color: '#006BB6' },
-  '1610612756': { abbr: 'PHX', color: '#1D1160' },
-  '1610612757': { abbr: 'POR', color: '#E03A3E' },
-  '1610612758': { abbr: 'SAC', color: '#5A2D81' },
-  '1610612759': { abbr: 'SAS', color: '#C4CED4' },
-  '1610612761': { abbr: 'TOR', color: '#CE1141' },
-  '1610612762': { abbr: 'UTA', color: '#002B5C' },
-  '1610612764': { abbr: 'WAS', color: '#002B5C' }
+const NBA_TEAMS_MAP: Record<string, { abbr: string }> = {
+  '1610612737': { abbr: 'ATL' }, '1610612738': { abbr: 'BOS' }, '1610612751': { abbr: 'BKN' },
+  '1610612766': { abbr: 'CHA' }, '1610612741': { abbr: 'CHI' }, '1610612739': { abbr: 'CLE' },
+  '1610612742': { abbr: 'DAL' }, '1610612743': { abbr: 'DEN' }, '1610612765': { abbr: 'DET' },
+  '1610612744': { abbr: 'GSW' }, '1610612745': { abbr: 'HOU' }, '1610612754': { abbr: 'IND' },
+  '1610612746': { abbr: 'LAC' }, '1610612747': { abbr: 'LAL' }, '1610612763': { abbr: 'MEM' },
+  '1610612748': { abbr: 'MIA' }, '1610612749': { abbr: 'MIL' }, '1610612750': { abbr: 'MIN' },
+  '1610612740': { abbr: 'NOP' }, '1610612752': { abbr: 'NYK' }, '1610612760': { abbr: 'OKC' },
+  '1610612753': { abbr: 'ORL' }, '1610612755': { abbr: 'PHI' }, '1610612756': { abbr: 'PHX' },
+  '1610612757': { abbr: 'POR' }, '1610612758': { abbr: 'SAC' }, '1610612759': { abbr: 'SAS' },
+  '1610612761': { abbr: 'TOR' }, '1610612762': { abbr: 'UTA' }, '1610612764': { abbr: 'WAS' },
 }
 
 interface TeamWithStats {
-  id: string
-  name: string
-  abbr: string
-  wins: number
-  losses: number
-  ppg: number
-  rpg: number
-  apg: number
-  conference: string
-  conferenceRank: number
-  color: string
-  logoUrl: string
+  id: string; name: string; abbr: string; wins: number; losses: number
+  ppg: number; rpg: number; apg: number; conference: string; conferenceRank: number; logoUrl: string
 }
 
 interface Player {
-  id: string
-  name: string
-  number: string
-  position: string
-  height: string
-  weight: string
-  age: number
+  id: string; name: string; number: string; position: string; height: string; weight: string; age: number
 }
 
 export default function TeamsPage() {
@@ -75,40 +37,26 @@ export default function TeamsPage() {
   const [error, setError] = useState('')
   const [conferenceFilter, setConferenceFilter] = useState<'all' | 'East' | 'West'>('all')
 
-  // Fetch teams with stats on mount
-  useEffect(() => {
-    fetchTeams()
-  }, [])
+  useEffect(() => { fetchTeams() }, [])
 
   const fetchTeams = async () => {
     try {
       setLoadingTeams(true)
       setError('')
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-      
       const response = await fetch(`${apiUrl}/api/teams/stats`)
       const data = await response.json()
-
       if (data.success && data.data) {
-        // Enrich teams with abbreviations, colors, and logo URLs
-        const enrichedTeams: TeamWithStats[] = data.data.map((team: any) => {
-          const teamInfo = NBA_TEAMS_MAP[team.id] || { abbr: 'NBA', color: '#FCD34D' }
-          return {
-            ...team,
-            abbr: teamInfo.abbr,
-            color: teamInfo.color,
-            logoUrl: `https://cdn.nba.com/logos/nba/${team.id}/primary/L/logo.svg`
-          }
+        const enriched: TeamWithStats[] = data.data.map((team: any) => {
+          const info = NBA_TEAMS_MAP[team.id] || { abbr: 'NBA' }
+          return { ...team, abbr: info.abbr, logoUrl: `https://cdn.nba.com/logos/nba/${team.id}/primary/L/logo.svg` }
         })
-
-        setTeams(enrichedTeams)
+        setTeams(enriched)
       } else {
         setError(data.error || 'Failed to load teams')
       }
-
       setLoadingTeams(false)
     } catch (err) {
-      console.error('Error fetching teams:', err)
       setError('Failed to fetch teams from API')
       setLoadingTeams(false)
     }
@@ -119,32 +67,23 @@ export default function TeamsPage() {
       setLoading(true)
       setError('')
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-      
       const response = await fetch(`${apiUrl}/api/team/${teamId}/roster`)
       const data = await response.json()
-
       if (data.success && data.data) {
         const headers = data.data.headers
-        const players = data.data.rowSet
-
-        const parsedRoster: Player[] = players.map((player: any[]) => {
-          return {
-            id: player[headers.indexOf('PLAYER_ID')]?.toString() || '',
-            name: player[headers.indexOf('PLAYER')] || 'Unknown',
-            number: player[headers.indexOf('NUM')] || '-',
-            position: player[headers.indexOf('POSITION')] || '-',
-            height: player[headers.indexOf('HEIGHT')] || '-',
-            weight: player[headers.indexOf('WEIGHT')] || '-',
-            age: player[headers.indexOf('AGE')] || 0
-          }
-        })
-
+        const parsedRoster: Player[] = data.data.rowSet.map((player: any[]) => ({
+          id: player[headers.indexOf('PLAYER_ID')]?.toString() || '',
+          name: player[headers.indexOf('PLAYER')] || 'Unknown',
+          number: player[headers.indexOf('NUM')] || '-',
+          position: player[headers.indexOf('POSITION')] || '-',
+          height: player[headers.indexOf('HEIGHT')] || '-',
+          weight: player[headers.indexOf('WEIGHT')] || '-',
+          age: player[headers.indexOf('AGE')] || 0,
+        }))
         setRoster(parsedRoster.sort((a, b) => a.name.localeCompare(b.name)))
       }
-
       setLoading(false)
     } catch (err) {
-      console.error('Error fetching roster:', err)
       setError('Failed to load roster')
       setLoading(false)
     }
@@ -155,266 +94,152 @@ export default function TeamsPage() {
     fetchRoster(team.id)
   }
 
-  // Filter teams by conference
-  const filteredTeams = teams.filter(team => 
-    conferenceFilter === 'all' || team.conference === conferenceFilter
-  )
-
-  // Calculate team "market cap" (simple formula based on performance)
-  const calculateMarketCap = (team: TeamWithStats) => {
-    const winRate = team.wins / (team.wins + team.losses) || 0
-    const baseValue = 2500 // Million
-    return (baseValue * (1 + winRate * 0.5)).toFixed(0)
-  }
+  const filteredTeams = teams.filter(t => conferenceFilter === 'all' || t.conference === conferenceFilter)
 
   return (
-    <main className="min-h-screen bg-black py-8 px-4">
-      <div className="max-w-[1800px] mx-auto space-y-6">
-        
-        {/* Header with Navigation */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-4 mb-2">
-              <button
-                onClick={() => router.push('/')}
-                className="text-primary hover:text-yellow-300 transition-colors"
-              >
-                <span className="text-2xl">←</span>
+    <main className="min-h-screen bg-surface-0">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-6 md:px-10 py-4 border-b border-border">
+        <div className="flex items-center gap-10">
+          <button onClick={() => router.push('/')} className="text-accent text-xl font-extrabold tracking-tight">HOOPMARKET</button>
+          <div className="hidden md:flex items-center gap-1">
+            {[{ l: 'Players', h: '/' }, { l: 'Teams', h: '/teams' }, { l: 'Compare', h: '/compare' }, { l: 'Games', h: '/games' }, { l: 'Reports', h: '/reports' }].map(link => (
+              <button key={link.h} onClick={() => router.push(link.h)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${link.h === '/teams' ? 'text-accent bg-accent-glow' : 'text-text-secondary hover:text-text-primary'}`}>
+                {link.l}
               </button>
-              <h1 className="text-4xl md:text-5xl font-black text-primary uppercase tracking-tight">
-                Franchise Exchange
-              </h1>
-            </div>
-            <p className="text-text-muted text-sm uppercase tracking-wider font-semibold">
-              📊 30 Team Portfolios • Live Performance Data
-            </p>
+            ))}
           </div>
+        </div>
+      </nav>
 
-          {/* Conference Filter */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConferenceFilter('all')}
-              className={`px-6 py-2 rounded-lg font-bold uppercase text-sm transition-all ${
-                conferenceFilter === 'all'
-                  ? 'bg-primary text-black'
-                  : 'bg-card-dark border border-border-dark text-text-muted hover:border-primary'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setConferenceFilter('East')}
-              className={`px-6 py-2 rounded-lg font-bold uppercase text-sm transition-all ${
-                conferenceFilter === 'East'
-                  ? 'bg-primary text-black'
-                  : 'bg-card-dark border border-border-dark text-text-muted hover:border-primary'
-              }`}
-            >
-              Eastern
-            </button>
-            <button
-              onClick={() => setConferenceFilter('West')}
-              className={`px-6 py-2 rounded-lg font-bold uppercase text-sm transition-all ${
-                conferenceFilter === 'West'
-                  ? 'bg-primary text-black'
-                  : 'bg-card-dark border border-border-dark text-text-muted hover:border-primary'
-              }`}
-            >
-              Western
-            </button>
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 animate-fade-in">
+          <div>
+            <h1 className="text-headline text-text-primary">Teams</h1>
+            <p className="text-sm text-text-secondary mt-1">30 franchises · standings & rosters</p>
+          </div>
+          <div className="flex gap-1.5">
+            {(['all', 'East', 'West'] as const).map(conf => (
+              <button key={conf} onClick={() => setConferenceFilter(conf)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  conferenceFilter === conf ? 'bg-accent text-white' : 'bg-surface-1 border border-border text-text-secondary hover:text-text-primary'
+                }`}>
+                {conf === 'all' ? 'All' : conf === 'East' ? 'Eastern' : 'Western'}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Error Display */}
+        {/* Loading */}
+        {loadingTeams && (
+          <div className="flex items-center justify-center py-32 animate-fade-in">
+            <div className="w-10 h-10 border-2 border-surface-3 border-t-accent rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Error */}
         {error && !loadingTeams && (
-          <div className="bg-market-red/10 border border-market-red rounded-xl p-6 text-center">
-            <p className="text-market-red font-bold mb-3">⚠️ {error}</p>
-            <button
-              onClick={fetchTeams}
-              className="px-6 py-2 bg-primary text-black font-bold rounded-lg hover:bg-yellow-300 transition-all"
-            >
-              🔄 Reconnect to Market
+          <div className="bg-surface-1 border border-negative/20 rounded-2xl p-8 text-center animate-fade-in">
+            <p className="text-text-primary font-semibold mb-2">{error}</p>
+            <button onClick={fetchTeams}
+              className="mt-3 px-5 py-2.5 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent-dim transition-colors">
+              Retry
             </button>
           </div>
         )}
 
-        {/* Loading State */}
-        {loadingTeams ? (
-          <div className="text-center py-20">
-            <div className="relative inline-block">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl">📊</span>
-              </div>
-            </div>
-            <p className="text-primary mt-4 font-bold uppercase tracking-wider">Loading Franchises...</p>
-          </div>
-        ) : !error && filteredTeams.length === 0 ? (
-          <div className="bg-card-dark border border-border-dark rounded-xl p-12 text-center">
-            <div className="text-6xl mb-4">🏀</div>
-            <h2 className="text-2xl font-black text-primary mb-2">NO FRANCHISES FOUND</h2>
-            <p className="text-text-muted">Try adjusting your conference filter</p>
-          </div>
-        ) : (
-          <>
-            {/* Teams Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {filteredTeams.map((team) => {
-                const marketCap = calculateMarketCap(team)
-                const winPct = ((team.wins / (team.wins + team.losses)) * 100).toFixed(1)
-                
-                return (
-                  <button
-                    key={team.id}
-                    onClick={() => handleTeamClick(team)}
-                    className={`p-4 rounded-xl transition-all border text-left ${
-                      selectedTeam?.id === team.id
-                        ? 'bg-gradient-to-br from-primary/20 to-primary/10 border-primary shadow-lg shadow-primary/20'
-                        : 'bg-card-dark/50 border-border-dark hover:border-primary/50'
-                    }`}
-                  >
-                    {/* Team Logo and Ticker */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-white rounded-lg p-1.5 flex items-center justify-center">
-                          <img 
-                            src={team.logoUrl} 
-                            alt={team.name}
-                            className="w-full h-full object-contain"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <p className="font-black text-white text-sm uppercase tracking-wide">{team.abbr}</p>
-                          <p className="text-xs text-text-muted uppercase font-bold">{team.conference}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-text-muted uppercase font-bold">Rank</p>
-                        <p className="text-primary font-black text-lg">#{team.conferenceRank}</p>
-                      </div>
-                    </div>
-
-                    {/* Team Name */}
-                    <h3 className="font-bold text-white text-xs mb-3 truncate">{team.name}</h3>
-
-                    {/* Market Cap */}
-                    <div className="mb-3 pb-3 border-b border-border-dark">
-                      <p className="text-xs text-text-muted uppercase font-bold mb-1">Market Cap</p>
-                      <p className="text-primary font-black text-lg">${marketCap}M</p>
-                    </div>
-
-                    {/* Record */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-xs text-text-muted uppercase font-bold">Record</p>
-                        <p className="text-white font-bold">{team.wins}-{team.losses}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-text-muted uppercase font-bold">Win %</p>
-                        <p className={`font-bold ${parseFloat(winPct) >= 50 ? 'text-market-green' : 'text-market-red'}`}>
-                          {winPct}%
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-background-dark rounded-lg p-2">
-                        <p className="text-xs text-text-muted font-bold">PPG</p>
-                        <p className="text-white font-bold text-sm">{team.ppg.toFixed(1)}</p>
-                      </div>
-                      <div className="bg-background-dark rounded-lg p-2">
-                        <p className="text-xs text-text-muted font-bold">RPG</p>
-                        <p className="text-white font-bold text-sm">{team.rpg.toFixed(1)}</p>
-                      </div>
-                      <div className="bg-background-dark rounded-lg p-2">
-                        <p className="text-xs text-text-muted font-bold">APG</p>
-                        <p className="text-white font-bold text-sm">{team.apg.toFixed(1)}</p>
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
+        {/* Teams List */}
+        {!loadingTeams && !error && (
+          <div className="animate-fade-up">
+            <div className="hidden md:grid grid-cols-[1fr_60px_80px_60px_60px_60px] gap-4 px-4 py-2 text-label text-text-tertiary uppercase border-b border-border">
+              <span>Team</span>
+              <span className="text-right">Rank</span>
+              <span className="text-right">Record</span>
+              <span className="text-right">PPG</span>
+              <span className="text-right">RPG</span>
+              <span className="text-right">APG</span>
             </div>
 
-            {/* Selected Team Roster */}
-            {selectedTeam && (
-              <div className="mt-8 bg-card-dark border border-border-dark rounded-xl overflow-hidden">
-                {/* Roster Header */}
-                <div className="bg-gradient-to-r from-primary/20 to-transparent p-6 border-b border-border-dark">
+            {filteredTeams.map((team) => {
+              const winPct = ((team.wins / (team.wins + team.losses)) * 100).toFixed(1)
+              const isSelected = selectedTeam?.id === team.id
+              return (
+                <button key={team.id} onClick={() => handleTeamClick(team)}
+                  className={`w-full hover-row grid grid-cols-[1fr_auto] md:grid-cols-[1fr_60px_80px_60px_60px_60px] gap-4 items-center px-4 py-4 border-b transition-colors text-left ${
+                    isSelected ? 'border-accent/30 bg-accent-glow' : 'border-border/50'
+                  }`}>
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-white rounded-xl p-2 flex items-center justify-center">
-                      <img 
-                        src={selectedTeam.logoUrl} 
-                        alt={selectedTeam.name}
-                        className="w-full h-full object-contain"
-                      />
+                    <div className="w-10 h-10 bg-white rounded-lg p-1.5 flex items-center justify-center shrink-0">
+                      <img src={team.logoUrl} alt={team.name} className="w-full h-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-black text-primary uppercase">{selectedTeam.name}</h2>
-                      <p className="text-text-muted uppercase text-sm font-bold tracking-wider">
-                        Active Roster • {selectedTeam.wins}-{selectedTeam.losses} ({((selectedTeam.wins / (selectedTeam.wins + selectedTeam.losses)) * 100).toFixed(1)}%)
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold truncate transition-colors ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
+                        {team.name}
                       </p>
+                      <p className="text-xs text-text-tertiary">{team.abbr} · {team.conference}</p>
                     </div>
                   </div>
-                </div>
 
-                {/* Roster Content */}
-                <div className="p-6">
-                  {loading ? (
-                    <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto mb-3"></div>
-                      <p className="text-text-muted font-bold">Loading roster...</p>
-                    </div>
-                  ) : roster.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-text-muted">No roster data available</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {roster.map((player) => (
-                        <div
-                          key={player.id}
-                          onClick={() => router.push(`/player/${player.id}`)}
-                          className="bg-background-dark border border-border-dark rounded-lg p-4 hover:border-primary transition-all cursor-pointer"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <p className="font-bold text-white text-sm">{player.name}</p>
-                              <p className="text-xs text-text-muted uppercase font-bold">{player.position}</p>
-                            </div>
-                            {player.number !== '-' && (
-                              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                                <span className="text-black font-black text-xs">#{player.number}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-xs">
-                            <div>
-                              <p className="text-text-muted font-bold">HT</p>
-                              <p className="text-white font-semibold">{player.height}</p>
-                            </div>
-                            <div>
-                              <p className="text-text-muted font-bold">WT</p>
-                              <p className="text-white font-semibold">{player.weight}</p>
-                            </div>
-                            <div>
-                              <p className="text-text-muted font-bold">AGE</p>
-                              <p className="text-white font-semibold">{player.age}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  <div className="flex md:hidden items-center gap-3 text-sm">
+                    <span className="stat-num font-bold text-text-secondary">#{team.conferenceRank}</span>
+                    <span className="stat-num text-text-secondary">{team.wins}-{team.losses}</span>
+                  </div>
+
+                  <span className="hidden md:block stat-num text-sm font-semibold text-text-primary text-right">#{team.conferenceRank}</span>
+                  <div className="hidden md:block text-right">
+                    <span className="stat-num text-sm text-text-primary">{team.wins}-{team.losses}</span>
+                    <p className={`stat-num text-xs ${parseFloat(winPct) >= 50 ? 'text-positive' : 'text-negative'}`}>{winPct}%</p>
+                  </div>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{team.ppg.toFixed(1)}</span>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{team.rpg.toFixed(1)}</span>
+                  <span className="hidden md:block stat-num text-sm text-text-secondary text-right">{team.apg.toFixed(1)}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Roster Panel */}
+        {selectedTeam && (
+          <div className="mt-8 bg-surface-1 border border-border rounded-2xl overflow-hidden animate-fade-up">
+            <div className="flex items-center gap-4 px-6 py-5 border-b border-border">
+              <div className="w-12 h-12 bg-white rounded-xl p-2 flex items-center justify-center">
+                <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="w-full h-full object-contain" />
               </div>
-            )}
-          </>
+              <div>
+                <h2 className="text-title text-text-primary">{selectedTeam.name} Roster</h2>
+                <p className="text-xs text-text-tertiary">{selectedTeam.wins}-{selectedTeam.losses} · {selectedTeam.conference}ern Conference</p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-2 border-surface-3 border-t-accent rounded-full animate-spin" />
+                </div>
+              ) : roster.length === 0 ? (
+                <p className="text-center py-12 text-text-tertiary">No roster data available</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {roster.map((player) => (
+                    <button key={player.id} onClick={() => router.push(`/player/${player.id}`)}
+                      className="hover-row flex items-center justify-between p-4 rounded-xl border border-border/50 text-left transition-colors">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{player.name}</p>
+                        <p className="text-xs text-text-tertiary">{player.position} · {player.height} · {player.age} yrs</p>
+                      </div>
+                      {player.number !== '-' && (
+                        <span className="stat-num text-sm text-text-tertiary font-medium">#{player.number}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </main>
